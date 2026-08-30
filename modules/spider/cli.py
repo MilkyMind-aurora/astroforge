@@ -22,7 +22,7 @@ def run_single(cfg: dict) -> dict:
     output_dir = Path(cfg.get("output_dir", "output"))
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "single_page.md"
-    text, title = fetch.fetch_page_text(url)
+    text, title = fetch.fetch_page_text(url, browser=cfg.get("browser"))
     md = f"# {title}\n\n{text}\n"
     output_path.write_text(md, encoding="utf-8")
     info(f"单页抓取完成: {output_path}")
@@ -40,6 +40,8 @@ def run_site(cfg: dict) -> dict:
         structured=bool(cfg.get("structured", True)),
         # 断点续爬默认开启；cfg["resume"]=false 强制全量重爬
         resume=bool(cfg.get("resume", True)),
+        # browser 配置存在时经 Scrapling/本地 Chromium 渲染抓取
+        browser=cfg.get("browser"),
     )
 
 

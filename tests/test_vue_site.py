@@ -86,7 +86,7 @@ def _patch_fetch(monkeypatch: pytest.MonkeyPatch, pages: dict[str, str]) -> list
     """把 fetch.fetch_html 替换为离线映射；返回被请求 URL 的记录列表。"""
     calls: list[str] = []
 
-    def fake_fetch_html(url: str) -> str:
+    def fake_fetch_html(url: str, browser: dict | None = None) -> str:
         calls.append(url)
         if url not in pages:
             raise AssertionError(f"意外出网请求: {url}")
@@ -218,7 +218,7 @@ def test_site_fallback_bfs_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 def test_site_structured_blocked_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """入口页抓取异常（如反爬拦截）→ 诚实返回 3004，不伪装成功。"""
-    def boom(url: str) -> str:
+    def boom(url: str, browser: dict | None = None) -> str:
         raise RuntimeError("403 Forbidden")
 
     monkeypatch.setattr(fetch, "fetch_html", boom)

@@ -93,10 +93,12 @@ def _write_structured_page(chapter_dir: Path, page_url: str, title: str,
 
 
 def crawl_site(url: str, output_dir: Path, max_pages: int = 200, interval: float = 1.0,
-               structured: bool = True, resume: bool = True) -> dict:
+               structured: bool = True, resume: bool = True,
+               browser: dict | None = None) -> dict:
     """整站爬取入口：先试侧边栏结构化，解析不到目录则回落同域 BFS。
 
     resume=True 时加载 .crawl_state.json：已完成页面跳过、失败页面重试。
+    browser 配置存在时经 Scrapling 渲染抓取（本地 Chromium）。
     返回 {"code": 0, "data": {...}} 或 {"code": 3004, ...}（反爬拦截/零页面）。
     """
     import fetch  # 延迟导入：单测 monkeypatch fetch.fetch_html 生效
@@ -107,7 +109,7 @@ def crawl_site(url: str, output_dir: Path, max_pages: int = 200, interval: float
 
     if structured:
         try:
-            entry_html = fetch.fetch_html(url)
+            entry_html = fetch.fetch_html(url, browser)
         except UrlGuardError:
             raise  # URL 安全校验问题交由上层 CLI 归类（1002），不伪装成反爬
         except Exception as exc:
@@ -115,21 +117,23 @@ def crawl_site(url: str, output_dir: Path, max_pages: int = 200, interval: float
                         {"mode": "structured",
                          "failed": [{"url": url, "error": str(exc)}]})
         result = _crawl_structured(url, entry_html, output_dir, max_pages, interval,
-                                   fetch, state)
+                                   fetch, state, browser)
         if result is not None:
             if resumed:
                 result["data"]["resumed"] = True
             return result
         info("未解析到侧边栏目录，回落同域 BFS 爬取")
         return _crawl_bfs(url, output_dir, max_pages, interval, fetch,
-                          fallback=True, state=state, entry_html=entry_html)
+                          fallback=True, state=state, entry_html=entry_html,
+                          browser=browser)
 
-    return _crawl_bfs(url, output_dir, max_pages, interval, fetch, state=state)
+    return _crawl_bfs(url, output_dir, max_pages, interval, fetch, state=state,
+                      browser=browser)
 
 
 def _crawl_structured(url: str, entry_html: str, output_dir: Path,
                       max_pages: int, interval: float, fetch,
-                      state: dict) -> dict | None:
+                      state: dict, browser: dict | None = None) -> dict | None:
     """侧边栏结构化爬取；解析不到目录时返回 None（调用方回落 BFS）。"""
     items = sidebar_parser.parse_sidebar(entry_html, url)
     if not items:
@@ -173,7 +177,7 @@ def _crawl_structured(url: str, entry_html: str, output_dir: Path,
     for index, (target, chapter) in enumerate(queue, start=1):
         try:
             # 入口页复用已抓取的 HTML，省一次请求
-            page_html = entry_html if target == entry else fetch.fetch_html(target)
+            page_html = entry_html if target == entry else fetch.fetch_html(target, browser)
             text, title = fetch.html_to_md(page_html, base_url=target)
             path = _write_structured_page(chapter_dirs[chapter], target, title, text, used_stems)
             pages.append({"url": target, "path": str(path), "chapter": chapter, "title": title})
@@ -214,7 +218,8 @@ def _crawl_structured(url: str, entry_html: str, output_dir: Path,
 
 def _crawl_bfs(url: str, output_dir: Path, max_pages: int, interval: float,
                fetch, fallback: bool = False,
-               state: dict | None = None, entry_html: str | None = None) -> dict:
+               state: dict | None = None, entry_html: str | None = None,
+               browser: dict | None = None) -> dict:
     """同 host BFS 骨干：抓正文存 Markdown；fallback=True 时在 data 注明回落。"""
     completed: set[str] = set((state or {}).get("completed", []))
     failed_state: dict[str, str] = dict((state or {}).get("failed", {}))
@@ -233,7 +238,7 @@ def _crawl_bfs(url: str, output_dir: Path, max_pages: int, interval: float,
         try:
             # 入口页复用已抓取的 HTML（structured 回落时省一次请求）
             html = entry_html if (current == entry and entry_html is not None) \
-                else fetch.fetch_html(current)
+                else fetch.fetch_html(current, browser)
             text, title = fetch.html_to_md(html, base_url=current)
             slug = (urlparse(current).path.strip("/") or "index").replace("/", "_") or "index"
             target = output_dir / f"{slug}.md"

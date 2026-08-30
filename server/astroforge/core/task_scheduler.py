@@ -217,6 +217,13 @@ class Scheduler:
             step["status"] = "running"
             # 模块 CLI 契约要求 task_type 在配置内（方案 3.8 模块接口约定）
             step_config = {"task_type": task_type, **dict(record.config)}
+            if task_type.startswith("spider"):
+                # 注入浏览器配置（settings 平台覆盖已解析出本机 Chromium 路径）
+                step_config.setdefault("browser", {
+                    "chromium_path": self.settings.browser.chromium_path,
+                    "headless": self.settings.browser.headless,
+                    "no_sandbox": self.settings.browser.no_sandbox,
+                })
             if record.mode == "pipeline":
                 pipeline = self.engine.get(record.config.get("pipeline", ""))
                 if pipeline is not None:

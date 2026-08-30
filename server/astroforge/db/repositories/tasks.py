@@ -9,10 +9,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from astroforge.db.models import Artifact, Pipeline, Task, TaskStep
+from astroforge.db.models import AiConversation, AiMessage, Artifact, Pipeline, Task, TaskStep
 
 
 def _now() -> datetime:
@@ -144,3 +144,51 @@ class PipelinesRepo:
             row.version = version
             row.yaml_content = yaml_content
         await self.session.commit()
+
+
+class AiRepo:
+    """AI 会话/消息持久化（Phase 6.1.7，ai_conversations + ai_messages）。
+
+    注：与 PipelinesRepo 同因暂寄本文件，重构时平移至 repositories/ai.py。
+    """
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create_conversation(self, title: str | None = None) -> AiConversation:
+        conversation = AiConversation(title=title)
+        self.session.add(conversation)
+        await self.session.commit()
+        await self.session.refresh(conversation)
+        return conversation
+
+    async def get_conversation(self, conversation_id: int) -> AiConversation | None:
+        return await self.session.get(AiConversation, conversation_id)
+
+    async def append_message(
+        self, conversation_id: int, role: str, content: str,
+        instruction_json: dict | None = None,
+    ) -> None:
+        self.session.add(AiMessage(
+            conversation_id=conversation_id, role=role, content=content,
+            instruction_json=instruction_json,
+        ))
+        await self.session.commit()
+
+    async def list_conversations(self) -> list[tuple[int, str | None, int]]:
+        """返回 [(id, title, 消息数)]，按更新时间倒序。"""
+        rows = (await self.session.execute(
+            select(AiConversation.id, AiConversation.title, func.count(AiMessage.id))
+            .outerjoin(AiMessage, AiMessage.conversation_id == AiConversation.id)
+            .group_by(AiConversation.id)
+            .order_by(AiConversation.updated_at.desc())
+        )).all()
+        return [(r[0], r[1], r[2]) for r in rows]
+
+    async def messages(self, conversation_id: int) -> list[AiMessage]:
+        rows = (await self.session.execute(
+            select(AiMessage)
+            .where(AiMessage.conversation_id == conversation_id)  # 绑定参数
+            .order_by(AiMessage.created_at)
+        )).scalars()
+        return list(rows)

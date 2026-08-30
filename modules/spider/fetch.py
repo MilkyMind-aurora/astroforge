@@ -183,11 +183,22 @@ def _http_get(url: str, timeout: int = 30) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
-def fetch_html(url: str) -> str:
-    """抓取原始 HTML（Scrapling 优先，回退 urllib）。"""
+def _scrapling_get(url: str, browser: dict | None) -> str:
+    """经 browser_launcher 用本地 Chromium 渲染抓取（scrapling 0.4.x 会话参数）。"""
+    import browser_launcher
+
+    return browser_launcher.render_fetch(url, browser or {})
+
+
+def fetch_html(url: str, browser: dict | None = None) -> str:
+    """抓取原始 HTML：browser 配置存在且 Scrapling 可用时走渲染路径，
+    否则回退 urllib（两者均经外联校验与受限重定向）。"""
     url = validate_external_url(url)
-    if SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
-        return _ScraplingFetcher().get(url).html_content
+    if browser and SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
+        try:
+            return _scrapling_get(url, browser)
+        except Exception as exc:  # 渲染失败回退静态抓取
+            print(f"[WARN] Scrapling 渲染失败，回退 urllib: {exc}", flush=True)
     return _http_get(url)
 
 
@@ -199,18 +210,17 @@ def html_to_md(html: str, base_url: str = "") -> tuple[str, str]:
     return text, title or ""
 
 
-def fetch_page_text(url: str) -> tuple[str, str]:
-    """返回 (结构化 Markdown, 标题)。"""
+def fetch_page_text(url: str, browser: dict | None = None) -> tuple[str, str]:
+    """返回 (结构化 Markdown, 标题)；browser 配置存在时走渲染路径。"""
     url = validate_external_url(url)
-    if SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
-        page = _ScraplingFetcher().get(url)
-        title = page.css_first("title::text") or url
-        body = page.html_to_markdown() if hasattr(page, "html_to_markdown") else ""
-        if not body:
-            text, _ = html_to_md(page.html_content, url)
-            body = text
-        return body, title
-    text, title = html_to_md(_http_get(url), url)
+    if browser and SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
+        try:
+            html = _scrapling_get(url, browser)
+        except Exception:
+            html = _http_get(url)
+    else:
+        html = _http_get(url)
+    text, title = html_to_md(html, url)
     return text, title or url
 
 

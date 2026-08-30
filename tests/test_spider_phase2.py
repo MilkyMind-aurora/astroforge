@@ -55,7 +55,7 @@ def test_bfs_resume_skips_completed(tmp_path, monkeypatch):
 
     calls: list[str] = []
 
-    def fake_fetch_html(url: str) -> str:
+    def fake_fetch_html(url: str, browser: dict | None = None) -> str:
         calls.append(url)
         return PAGE1_HTML if "page1" in url else PAGE2_HTML
 
@@ -70,7 +70,7 @@ def test_bfs_resume_skips_completed(tmp_path, monkeypatch):
     calls.clear()
     monkeypatch.setattr(
         fetch, "fetch_html",
-        lambda url: (calls.append(url), PAGE1_HTML)[1],
+        lambda url, browser=None: (calls.append(url), PAGE1_HTML)[1],
     )
     second = crawl_site("https://example.com/doc/page1.html", out, max_pages=5, interval=0)
     assert second["code"] == 0
@@ -95,7 +95,7 @@ def test_structured_index_written(tmp_path, monkeypatch):
         "https://example.com/guide/quick.html": PAGE2_HTML,
     }
 
-    def fake_fetch_html(url: str) -> str:
+    def fake_fetch_html(url: str, browser: dict | None = None) -> str:
         return sidebar_html if url.endswith("entry.html") else pages.get(url, PAGE2_HTML)
 
     monkeypatch.setattr(fetch, "fetch_html", fake_fetch_html)
