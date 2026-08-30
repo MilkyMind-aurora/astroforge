@@ -50,3 +50,11 @@ def test_plain_chat_no_instruction():
 def test_invalid_action_rejected():
     result = parse_instruction('{"action": "delete_all", "task_type": "mineru"}')
     assert result.instruction is None
+
+
+def test_qwen3_think_block_stripped():
+    """Qwen3 系模型 <think> 块不影响指令提取。"""
+    output = "<think>\n用户想爬取页面\n</think>\n```json\n" + JSON + "\n```"
+    result = parse_instruction(output)
+    assert result.instruction is not None
+    assert result.instruction["task_type"] == "spider_site"

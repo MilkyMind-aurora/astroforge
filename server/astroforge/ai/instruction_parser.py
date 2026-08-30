@@ -14,6 +14,7 @@ from astroforge.core.config_loader import AiSettings
 
 CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)  # Qwen3 系推理块，解析前剥离
 VALID_ACTIONS = {"spider", "parse", "convert", "pipeline"}
 VALID_TASK_TYPES = {
     "spider_single", "spider_site", "spider_pdf", "spider_table",
@@ -110,7 +111,8 @@ def _keyword_fallback(text: str) -> dict[str, Any] | None:
 def parse_instruction(model_output: str, settings: AiSettings | None = None) -> InstructionResult:
     """三层降级入口：模型输出 → 指令（可能为 None，纯对话场景）。"""
     result = InstructionResult(raw_reply=model_output)
-    parsed = _extract_codeblock(model_output) or _extract_loose(model_output)
+    text = THINK_RE.sub("", model_output)  # 剥离推理块再解析
+    parsed = _extract_codeblock(text) or _extract_loose(text)
     if parsed is not None:
         result.instruction = parsed
         return result
