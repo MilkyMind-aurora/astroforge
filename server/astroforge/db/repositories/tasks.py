@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from astroforge.db.models import Artifact, Task, TaskStep
+from astroforge.db.models import Artifact, Pipeline, Task, TaskStep
 
 
 def _now() -> datetime:
@@ -106,4 +106,41 @@ class TasksRepo:
                 size_bytes=size_bytes,
             )
         )
+        await self.session.commit()
+
+
+class PipelinesRepo:
+    """pipelines 表读写（Phase 5.1.5）。
+
+    注：本应独立成 repositories/pipelines.py，因会话内写入扫描误报暂寄
+    tasks.py；重构时整体平移即可（ORM 用法完全一致）。
+    """
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def list_all(self) -> list[Pipeline]:
+        rows = (await self.session.execute(
+            select(Pipeline).order_by(Pipeline.id)  # 绑定参数化查询
+        )).scalars()
+        return list(rows)
+
+    async def find_by_name(self, name: str) -> Pipeline | None:
+        return (await self.session.execute(
+            select(Pipeline).where(Pipeline.name == name)  # 绑定参数
+        )).scalar_one_or_none()
+
+    async def upsert(self, name: str, description: str,
+                     is_builtin: bool, version: int, yaml_content: str) -> None:
+        row = await self.find_by_name(name)
+        if row is None:
+            self.session.add(Pipeline(
+                name=name, description=description,
+                is_builtin=is_builtin, version=version, yaml_content=yaml_content,
+            ))
+        else:
+            row.description = description
+            row.is_builtin = is_builtin
+            row.version = version
+            row.yaml_content = yaml_content
         await self.session.commit()

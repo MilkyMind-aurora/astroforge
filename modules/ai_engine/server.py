@@ -7,8 +7,11 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -17,21 +20,37 @@ from pydantic import BaseModel
 
 app = FastAPI(title="AstroForge AI Engine", version="0.1.0")
 
-_state = {"model_key": None, "model": None}
+_state = {"model_key": None, "model": None, "last_used": 0.0}
 _lock = threading.Lock()
 
 # 模型清单与路径来源：环境变量 ASTROFORGE_MODEL_DIR（默认 ./models）
-# qwen2b 别名对应规格等价的真实模型（Qwen2.5-1.5B Q4_K_M，~1.0GB）
+# qwen2b 即方案指定的 empero-ai/Qwen3.8-2B-Distill（HF，经 hf-mirror 下载）
 MODEL_FILES = {
     "qwen2b": "Qwen3.8-2B-Q4_K_M.gguf",
     "ornith9b": "ornith-9b-q4.gguf",
 }
+# 闲置自动卸载（方案 2.4 机制 4 / 3.7 动态内存管理；秒）
+IDLE_TIMEOUT = int(os.environ.get("ASTROFORGE_IDLE_TIMEOUT", "300"))
 
 
 def _model_dir() -> Path:
-    import os
-
     return Path(os.environ.get("ASTROFORGE_MODEL_DIR", "./models"))
+
+
+@app.on_event("startup")
+async def _start_idle_watcher() -> None:
+    """闲置看护：模型加载后超过 IDLE_TIMEOUT 未使用即自动卸载（Phase 6.1.5）。"""
+    async def _watch() -> None:
+        while True:
+            await asyncio.sleep(30)
+            with _lock:
+                loaded = _state["model"] is not None
+            if loaded and time.time() - _state["last_used"] > IDLE_TIMEOUT:
+                with _lock:
+                    _state["model"] = None
+                    _state["model_key"] = None
+                print(f"[INFO] 模型闲置超过 {IDLE_TIMEOUT}s，已自动卸载释放内存", flush=True)
+    asyncio.create_task(_watch())
 
 
 def _load_model(model_key: str):
@@ -88,6 +107,7 @@ async def switch_model(body: ModelBody):
 async def infer(body: InferBody):
     if _state["model"] is None:
         raise HTTPException(status_code=503, detail={"code": 3005, "message": "模型未加载"})
+    _state["last_used"] = time.time()
     with _lock:
         output = _state["model"](body.prompt, max_tokens=body.max_tokens, echo=False)
     return {"text": output["choices"][0]["text"]}
@@ -97,6 +117,7 @@ async def infer(body: InferBody):
 async def infer_stream(body: InferBody):
     if _state["model"] is None:
         raise HTTPException(status_code=503, detail={"code": 3005, "message": "模型未加载"})
+    _state["last_used"] = time.time()
 
     async def _sse():
         stream = _state["model"](body.prompt, max_tokens=body.max_tokens, echo=False, stream=True)

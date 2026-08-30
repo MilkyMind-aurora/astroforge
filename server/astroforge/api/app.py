@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI):
         db_engine.init_engine(settings)
         if settings.service.auto_upgrade_db:
             await _run_migrations()
+        await pipeline_engine.sync_db()  # Phase 5.1.5：流水线模板 DB 同步
     except Exception as exc:
         log.warning("数据库初始化失败（服务继续，任务退化为内存态）: %s", exc)
 

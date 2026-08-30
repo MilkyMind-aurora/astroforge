@@ -1,9 +1,11 @@
 """NovaFlow 流水线引擎：YAML 模板加载/校验/步骤展开（方案 3.5）。
 
-骨架版：模板驻内存 + 内置播种；pipelines 表持久化与断点续跑完整版属 Phase 5。
+模板驻内存 + 内置播种 + pipelines 表持久化（DB 优先，内存降级）；
+步骤级断点续跑完整版属 Phase 5 后续。
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -68,6 +70,39 @@ class PipelineEngine:
         log.info("NovaFlow 内置流水线播种完成: %d 条", count)
         return count
 
+    async def sync_db(self) -> int:
+        """启动同步（Phase 5.1.5）：加载 DB 自定义模板；内置模板缺失行回写。"""
+        try:
+            from astroforge.db import engine as db_engine
+            from astroforge.db.repositories.tasks import PipelinesRepo
+
+            async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+                repo = PipelinesRepo(session)
+                rows = await repo.list_all()
+                known = {r.name for r in rows}
+                loaded = 0
+                for row in rows:
+                    if row.name in self._pipelines:
+                        continue
+                    try:
+                        parsed = self.parse_yaml(row.yaml_content)
+                        parsed.is_builtin = row.is_builtin
+                        self._pipelines.setdefault(parsed.name, parsed)
+                        loaded += 1
+                    except ApiError:
+                        log.warning("DB 流水线 %s 校验失败，跳过", row.name)
+                for name, pipeline in self._pipelines.items():
+                    if pipeline.is_builtin and name not in known:
+                        await repo.upsert(
+                            name, pipeline.description, True,
+                            pipeline.version, pipeline.yaml_content,
+                        )
+            log.info("NovaFlow DB 同步完成：加载自定义 %d 条", loaded)
+            return loaded
+        except Exception as exc:
+            log.warning("流水线 DB 同步失败（仅内存态）: %s", exc)
+            return 0
+
     def parse_yaml(self, content: str) -> PipelineDef:
         """解析并校验 YAML；失败抛 ApiError(1004)。"""
         try:
@@ -108,8 +143,23 @@ class PipelineEngine:
         if existing is not None and existing.is_builtin:
             raise ApiError(ErrorCode.YAML_INVALID, f"名称与内置模板冲突: {parsed.name}")
         self._pipelines[parsed.name] = parsed
-        # TODO(Phase 5): 持久化到 pipelines 表（TasksRepo 同风格仓储）
+        # 持久化到 pipelines 表（尽力；DB 不可用时保留内存态，重启前有效）
+        asyncio.get_running_loop().create_task(self._db_upsert(parsed))
         return parsed
+
+    async def _db_upsert(self, parsed: PipelineDef) -> None:
+        try:
+            from astroforge.db import engine as db_engine
+            from astroforge.db.repositories.tasks import PipelinesRepo
+
+            async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+                repo = PipelinesRepo(session)
+                await repo.upsert(
+                    parsed.name, parsed.description, False,
+                    parsed.version, parsed.yaml_content,
+                )
+        except Exception as exc:
+            log.warning("流水线落库失败（保留内存态）: %s", exc)
 
     def get(self, name: str) -> PipelineDef | None:
         return self._pipelines.get(name)
