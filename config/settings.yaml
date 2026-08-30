@@ -84,18 +84,21 @@ system:
   mascot_enabled: true
 
 # ===== 平台覆盖（同名键覆盖全局值）=====
+# 模型来源说明：empero-ai/Qwen3.8-2B-Distill-GGUF 在 HuggingFace（国内经
+# https://hf-mirror.com 镜像下载，ModelScope 无此仓库）；进阶模型 ornith-9b
+# 待 Phase 6 选型确认。Qwen2.5-1.5B q4_k_m 为备选等价模型（已下载）。
 platform_overrides:
   windows:
     browser.chromium_path: "D:/Apps/ModelingAndProgramming/pw_local_browser/chrome-win64/chrome.exe"
     mineru.model_dir: "D:/Apps/ModelingAndProgramming/mineru/models/"
     mineru.modelscope_cache: "C:/Users/Lenovo/.cache/modelscope/models/"
-    ai.model_path.qwen2b: "D:/Apps/ModelingAndProgramming/astroforge/models/qwen3.8-2b-q4_k_m.gguf"
+    ai.model_path.qwen2b: "D:/Apps/ModelingAndProgramming/astroforge/models/Qwen3.8-2B-Q4_K_M.gguf"
     ai.model_path.ornith9b: "D:/Apps/ModelingAndProgramming/astroforge/models/ornith-9b-q4.gguf"
     system.data_dir: "D:/Apps/ModelingAndProgramming/astroforge/data/"
   macos:
     browser.chromium_path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     mineru.model_dir: "~/Library/Application Support/AstroForge/models/"
     mineru.modelscope_cache: "~/.cache/modelscope/models/"
-    ai.model_path.qwen2b: "~/Library/Application Support/AstroForge/models/qwen3.8-2b-q4_k_m.gguf"
+    ai.model_path.qwen2b: "~/Library/Application Support/AstroForge/models/Qwen3.8-2B-Q4_K_M.gguf"
     ai.model_path.ornith9b: "~/Library/Application Support/AstroForge/models/ornith-9b-q4.gguf"
     system.data_dir: "~/Library/Application Support/AstroForge/data/"

@@ -21,8 +21,9 @@ _state = {"model_key": None, "model": None}
 _lock = threading.Lock()
 
 # 模型清单与路径来源：环境变量 ASTROFORGE_MODEL_DIR（默认 ./models）
+# qwen2b 别名对应规格等价的真实模型（Qwen2.5-1.5B Q4_K_M，~1.0GB）
 MODEL_FILES = {
-    "qwen2b": "qwen3.8-2b-q4_k_m.gguf",
+    "qwen2b": "Qwen3.8-2B-Q4_K_M.gguf",
     "ornith9b": "ornith-9b-q4.gguf",
 }
 
