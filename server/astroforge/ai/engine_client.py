@@ -49,6 +49,30 @@ class EngineClient:
         except Exception as exc:
             raise EngineUnavailable(str(exc)) from exc
 
+    async def model_load(self, model_key: str) -> dict[str, Any]:
+        """加载指定模型（热切换，2B↔9B；首次加载耗时较长）。"""
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                resp = await client.post(
+                    f"{self.base_url}/v1/model/load", json={"model_key": model_key}
+                )
+            if resp.status_code != 200:
+                raise EngineUnavailable(f"模型加载失败 {resp.status_code}: {resp.text[:200]}")
+            return resp.json()
+        except EngineUnavailable:
+            raise
+        except Exception as exc:
+            raise EngineUnavailable(str(exc)) from exc
+
+    async def model_unload(self) -> dict[str, Any]:
+        """卸载当前模型释放内存（方案 2.4 机制 4）。"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(f"{self.base_url}/v1/model/unload")
+            return resp.json()
+        except Exception as exc:
+            raise EngineUnavailable(str(exc)) from exc
+
     async def infer_stream(self, prompt: str, max_tokens: int = 1024) -> AsyncIterator[str]:
         """SSE 流式推理：逐 data: 行 yield 文本增量。"""
         try:

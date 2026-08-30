@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -188,7 +189,63 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await ctx.hub.connect("ai", websocket)
         try:
             while True:
-                await websocket.receive_text()
+                raw = await websocket.receive_text()
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                message = (payload.get("message") or "").strip()
+                if not message:
+                    continue
+                # 流式对话：引擎 SSE 逐段转发 ai_delta（方案 3.7 / Phase 9.6）
+                from astroforge.ai.engine_client import EngineUnavailable
+                from astroforge.ai.instruction_parser import parse_instruction
+                from astroforge.api import routes_ai
+
+                conversation_id, db_backed = await routes_ai._resolve_conversation(
+                    ctx, payload.get("conversation_id"), title=message
+                )
+
+                async def _send(msg_type: str, data: dict) -> None:
+                    await ctx.hub.broadcast("ai", msg_type, {
+                        "conversation_id": conversation_id, **data})
+
+                await _send("ai_start", {"message": message})
+                await routes_ai._append_history(
+                    ctx, conversation_id, db_backed, "user", message, None)
+                chunks: list[str] = []
+                try:
+                    stream = await ctx.ai_client.infer_stream(message)
+                    async for delta in stream:
+                        chunks.append(delta)
+                        await _send("ai_delta", {"text": delta})
+                except EngineUnavailable as exc:
+                    await _send("ai_error", {"message": f"AI 引擎不可达: {exc}"})
+                    continue
+                model_output = "".join(chunks)
+                result = parse_instruction(model_output, ctx.settings.ai)
+                task_uuid = None
+                instruction_json = result.instruction
+                if instruction_json is not None:
+                    mode = ("pipeline"
+                            if instruction_json.get("action") == "pipeline" else "standalone")
+                    record = ctx.scheduler.create_task(
+                        instruction_json["task_type"], mode=mode,
+                        title=instruction_json.get("title"),
+                        config=instruction_json.get("params", {}),
+                    )
+                    task_uuid = record.task_uuid
+                await routes_ai._append_history(
+                    ctx, conversation_id, db_backed, "assistant", model_output,
+                    instruction_json)
+                await _send("ai_done", {
+                    "reply": model_output,
+                    "instruction": result.instruction,
+                    "fallback": result.fallback,
+                    "notice": (result.dropped_notes[0]
+                               if result.dropped_notes else None),
+                    "task_uuid": task_uuid,
+                })
         except WebSocketDisconnect:
             await ctx.hub.disconnect("ai", websocket)
 
