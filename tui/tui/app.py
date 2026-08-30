@@ -16,7 +16,10 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Static
 
+from tui.pages.history import HistoryPage
+from tui.pages.pipeline import PipelinePage
 from tui.pages.settings import SettingsPage
+from tui.pages.spider import SpiderPage
 from tui.service_client import ServiceClient, ServiceError, get_client
 from tui.ui.file_browser import FileBrowserScreen
 
@@ -293,10 +296,17 @@ class AstroForgeApp(App):
         key = PAGES[index][0]
         self._current_page = key
         content.remove_children()
+        client = get_client()
         if key == "home":
             content.mount(HomePage(id="page-home"))
         elif key == "settings":
-            content.mount(SettingsPage(get_client()))
+            content.mount(SettingsPage(client))
+        elif key == "spider":
+            content.mount(SpiderPage(client))
+        elif key == "pipeline":
+            content.mount(PipelinePage(client))
+        elif key == "history":
+            content.mount(HistoryPage(client))
         else:
             content.mount(PlaceholderPage(key))
 

@@ -59,8 +59,23 @@ class ServiceClient:
     async def env_check(self) -> dict:
         return await self._request("GET", "/api/v1/system/env-check")
 
-    async def list_tasks(self, page: int = 1) -> dict:
-        return await self._request("GET", f"/api/v1/tasks?page={page}")
+    async def list_tasks(self, page: int = 1, status: str | None = None) -> dict:
+        path = f"/api/v1/tasks?page={page}"
+        if status:
+            path += f"&status={status}"
+        return await self._request("GET", path)
+
+    # ---- Phase 2/5 客户端端点 ----
+    async def list_pipelines(self) -> dict:
+        return await self._request("GET", "/api/v1/pipelines")
+
+    async def run_pipeline(self, name: str, params: dict | None = None,
+                           title: str | None = None) -> dict:
+        body = {"params": params or {}, "title": title}
+        return await self._request("POST", f"/api/v1/pipelines/{name}/run", body)
+
+    async def save_pipeline(self, yaml_content: str) -> dict:
+        return await self._request("POST", "/api/v1/pipelines", {"yaml_content": yaml_content})
 
     async def create_task(self, task_type: str, config: dict, title: str | None = None) -> dict:
         return await self._request(
