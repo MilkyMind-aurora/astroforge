@@ -243,9 +243,43 @@ class Scheduler:
         else:
             record.status = "success"
             record.result = result
+            self._register_artifacts(record, result)
         record.finished_at = datetime.now(timezone.utc).isoformat()
         self._broadcast(record, "status")
         self._persist_status(record)
+
+    def _register_artifacts(self, record: TaskRecord, result: dict | None) -> None:
+        """成功任务把模块产出登记进 artifacts 表（方案 3.9 产物索引）。"""
+        paths: list[str] = []
+        data = (result or {}).get("data") or {}
+        if isinstance(data.get("output_path"), str):
+            paths.append(data["output_path"])
+        if isinstance(data.get("files"), list):
+            paths.extend(str(p) for p in data["files"])
+        if not paths or not self._db_available or self._sessionmaker is None:
+            return
+
+        async def _write() -> None:
+            try:
+                from pathlib import Path as _P
+
+                from astroforge.db.repositories.tasks import TasksRepo
+
+                async with self._sessionmaker() as session:  # type: ignore[misc]
+                    repo = TasksRepo(session)
+                    for p in paths:
+                        path = _P(p)
+                        await repo.add_artifact(
+                            uuid_lib.UUID(record.task_uuid),
+                            file_type=path.suffix.lstrip(".") or "file",
+                            file_name=path.name,
+                            file_path=p,
+                            size_bytes=path.stat().st_size if path.exists() else None,
+                        )
+            except Exception as exc:
+                log.warning("产物登记失败（不影响任务）: %s", exc)
+
+        asyncio.get_running_loop().create_task(_write())
 
     def _make_line_callback(self, record: TaskRecord) -> Any:
         async def on_line(line: str) -> None:

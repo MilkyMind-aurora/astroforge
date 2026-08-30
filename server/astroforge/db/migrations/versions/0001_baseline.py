@@ -1,7 +1,7 @@
 """0001 基线：创建方案 3.9 全部 10 张表
 
 Revision ID: 0001_baseline
-Revisen:
+Revises:
 Create Date: 2026-08-31
 
 说明：基线迁移直接以 ORM 元数据建表（create_all）；

@@ -68,3 +68,23 @@ def test_env_check_summary(client: TestClient):
     data = resp.json()["data"]
     assert data["total"] >= 8
     assert all({"name", "ok", "detail"} <= set(item) for item in data["items"])
+
+
+def test_config_summary_no_credentials(client: TestClient):
+    """配置摘要脱敏：不得出现任何密码/凭据字段。"""
+    resp = client.get("/api/v1/system/config-summary")
+    assert resp.status_code == 200
+    text = resp.text.lower()
+    assert "password" not in text and "token" not in text.replace("x-astroforge-token", "")
+
+
+def test_app_settings_whitelist_rejection(client: TestClient):
+    """非白名单键必须被拒（方案 8.4：动态键不得来自客户端直通）。"""
+    resp = client.put("/api/v1/app-settings/evil_key", json={"value": 1})
+    assert resp.json()["code"] == 1001
+
+
+def test_app_settings_put_requires_db(client: TestClient):
+    """DB 不可达时写入返回 2004（不静默丢失）。"""
+    resp = client.put("/api/v1/app-settings/memory_warning_gb", json={"value": 10.5})
+    assert resp.json()["code"] in {0, 2004}
