@@ -71,6 +71,38 @@ class ServiceClient:
     async def task_detail(self, task_uuid: str) -> dict:
         return await self._request("GET", f"/api/v1/tasks/{task_uuid}")
 
+    # ---- Phase 1 收尾新增端点 ----
+    async def list_app_settings(self) -> dict:
+        return await self._request("GET", "/api/v1/app-settings")
+
+    async def set_app_setting(self, key: str, value) -> dict:
+        return await self._request("PUT", f"/api/v1/app-settings/{key}", {"value": value})
+
+    async def config_summary(self) -> dict:
+        return await self._request("GET", "/api/v1/system/config-summary")
+
+    async def reset_token(self) -> dict:
+        return await self._request("POST", "/api/v1/service/token/reset")
+
+    async def running_task(self) -> dict | None:
+        """最近一个运行中任务（日志面板订阅目标）。"""
+        data = await self._request("GET", "/api/v1/tasks?status=running&page=1")
+        items = (data or {}).get("items") or []
+        return items[0] if items else None
+
+    async def browse_files(self, path: str = "") -> dict:
+        return await self._request("GET", f"/api/v1/files/browse?path={path}")
+
+    async def preview_file(self, path: str) -> dict:
+        return await self._request("GET", f"/api/v1/files/preview?path={path}")
+
+    async def subscribe_logs(self, task_uuid: str):
+        """连接 WS 日志通道，返回异步消息迭代器（websockets 库）。"""
+        import websockets
+
+        ws_url = f"{self.base_url.replace('http', 'ws')}/ws/logs/{task_uuid}?token={self.token}"
+        return await websockets.connect(ws_url)
+
 
 _client: ServiceClient | None = None
 

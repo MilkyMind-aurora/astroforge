@@ -7,14 +7,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.command import DiscoveryHit, Hits, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Static
 
-from tui.service_client import ServiceError, get_client
+from tui.pages.settings import SettingsPage
+from tui.service_client import ServiceClient, ServiceError, get_client
+from tui.ui.file_browser import FileBrowserScreen
 
 TAGLINE = "AstroForge — Forging Order from Stellar Chaos."
 VERSION = "Sidereal Core v0.1.0"
@@ -37,8 +41,37 @@ PAGE_PHASE = {
     "pipeline": ("Phase 5", "NovaFlow 流水线编排：内置模板一键全链路 + 断点续跑"),
     "monitor": ("Phase 1.2", "NovaFlow 实时监控看板：资源曲线 / 告警 / 历史回放"),
     "history": ("Phase 1.4", "任务历史：状态筛选 / 日志回看 / 一键重试"),
-    "settings": ("Phase 1.3", "路径配置 / 内存限制 / AI 配置 / 服务设置"),
 }
+
+
+class ForgeCommands(Provider):
+    """全局命令面板（方案 1.1.5）：/ 唤起，模糊搜索。"""
+
+    def _commands(self) -> list[tuple[str, object]]:
+        app = self.app
+        items: list[tuple[str, object]] = [
+            ("首页", lambda: app.switch_page(0)),
+            ("采集中心", lambda: app.switch_page(1)),
+            ("解析中心", lambda: app.switch_page(2)),
+            ("转换中心", lambda: app.switch_page(3)),
+            ("流水线", lambda: app.switch_page(4)),
+            ("监控看板", lambda: app.switch_page(5)),
+            ("任务历史", lambda: app.switch_page(6)),
+            ("设置", lambda: app.switch_page(7)),
+            ("打开文件浏览器", app.action_file_browser),
+            ("打开日志面板", app.action_toggle_log),
+            ("重连服务核心", app.reconnect),
+        ]
+        return items
+
+    async def discover(self) -> Hits:
+        for title, callback in self._commands():
+            yield DiscoveryHit(title, callback)
+
+    async def search(self, query: str) -> Hits:
+        for title, callback in self._commands():
+            if query.lower() in title.lower():
+                yield DiscoveryHit(title, callback)
 
 
 class ConnectScreen(ModalScreen):
@@ -136,6 +169,69 @@ class HomePage(VerticalScroll):
         self.query_one("#home-summary", Static).update("\n".join(lines))
 
 
+class LogScreen(ModalScreen):
+    """可折叠日志面板（方案 1.1.4）：自动订阅最近运行中任务的 WS 日志流。"""
+
+    CSS = """
+    LogScreen { align: center middle; }
+    #log-box { width: 90%; height: 60%; border: tall #4FC3F7; padding: 1 2; background: $surface; }
+    #log-body { height: 1fr; overflow: auto; }
+    """
+
+    def __init__(self, client: ServiceClient) -> None:
+        super().__init__()
+        self.client = client
+        self._ws = None
+
+    def compose(self) -> ComposeResult:
+        from textual.containers import Vertical
+
+        with Vertical(id="log-box"):
+            yield Static("📜 日志面板（订阅最近运行中任务）", id="log-title")
+            yield Static("正在查找运行中的任务…", id="log-body")
+            yield Button("关闭 (Esc)", id="log-close", variant="default")
+
+    def on_mount(self) -> None:
+        self.run_worker(self._follow(), exclusive=True)
+
+    async def _follow(self) -> None:
+        body = self.query_one("#log-body", Static)
+        try:
+            task = await self.client.running_task()
+        except Exception as exc:
+            body.update(f"[red]查询失败[/red] {exc}")
+            return
+        if task is None:
+            body.update("[dim]当前没有运行中的任务。启动任务后这里会实时滚动其日志。[/dim]")
+            return
+        task_uuid = task["task_uuid"]
+        body.update(f"[dim]已连接 ws/logs/{task_uuid}[/dim]\n")
+        try:
+            self._ws = await self.client.subscribe_logs(task_uuid)
+            async for raw in self._ws:
+                try:
+                    msg = json.loads(raw)
+                    payload = msg.get("payload", {})
+                    text = payload.get("text") or msg.get("type", "")
+                except json.JSONDecodeError:
+                    text = str(raw)
+                body.update(body.renderable + f"\n{text}")
+        except Exception as exc:
+            body.update(body.renderable + f"\n[red]日志流断开: {exc}[/red]")
+
+    def on_key(self, event) -> None:  # noqa: ANN001
+        if event.key == "escape":
+            self.dismiss()
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "log-close":
+            self.dismiss()
+
+    def on_unmount(self) -> None:
+        if self._ws is not None:
+            asyncio.create_task(self._ws.close())
+
+
 class AstroForgeApp(App):
     TITLE = "AstroForge 衍星台"
     SUB_TITLE = TAGLINE
@@ -146,9 +242,12 @@ class AstroForgeApp(App):
     #content { padding: 1 2; }
     .page-body { padding: 1 1; }
     """
+    COMMANDS = App.COMMANDS | {ForgeCommands}
     BINDINGS = [
+        Binding("/", "command_palette", "命令面板"),
         Binding("ctrl+shift+a", "ai_panel", "星伴 AI"),
         Binding("ctrl+grave", "toggle_log", "日志"),
+        Binding("f", "file_browser", "文件"),
         Binding("q", "quit", "退出"),
     ]
     _current_page = "home"
@@ -196,6 +295,8 @@ class AstroForgeApp(App):
         content.remove_children()
         if key == "home":
             content.mount(HomePage(id="page-home"))
+        elif key == "settings":
+            content.mount(SettingsPage(get_client()))
         else:
             content.mount(PlaceholderPage(key))
 
@@ -206,21 +307,11 @@ class AstroForgeApp(App):
     def action_ai_panel(self) -> None:
         self.push_screen(AiPanel())
 
+    def action_file_browser(self) -> None:
+        self.push_screen(FileBrowserScreen(get_client()))
+
     def action_toggle_log(self) -> None:
-        # 底部日志面板占位（WS logs 通道接入属 Phase 1.1.4）
-        content = self.query_one("#content", Vertical)
-        if self._log_visible:
-            if self._log_view is not None:
-                self._log_view.display = False
-            self._log_visible = False
-        else:
-            if self._log_view is None:
-                self._log_view = Static("[dim]日志面板：WS /ws/logs/{uuid} 接入属 Phase 1.1.4[/dim]",
-                                        id="log-dock")
-                asyncio.create_task(content.mount(self._log_view))
-            else:
-                self._log_view.display = True
-            self._log_visible = True
+        self.push_screen(LogScreen(get_client()))
 
 
 def main() -> None:
