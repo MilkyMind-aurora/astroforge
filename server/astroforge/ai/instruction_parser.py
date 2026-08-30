@@ -89,7 +89,8 @@ def _keyword_fallback(text: str) -> dict[str, Any] | None:
     url = URL_RE.search(text)
     path = PATH_RE.search(text)
     if action == "spider":
-        params["url"] = url.group(0) if url else None
+        # 模型自述/Markdown 链接常带尾随括号标点，剥掉避免脏 URL
+        params["url"] = url.group(0).rstrip(").,，;；、!！?？") if url else None
         task_type = "spider_single" if url else "spider_site"
     elif action == "parse":
         params["input_path"] = path.group(0) if path else None

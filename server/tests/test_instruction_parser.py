@@ -58,3 +58,15 @@ def test_qwen3_think_block_stripped():
     result = parse_instruction(output)
     assert result.instruction is not None
     assert result.instruction["task_type"] == "spider_site"
+
+
+def test_user_intent_preferred_over_model_prose():
+    """用户消息直接关键词派发（用户意图优先于模型散文）；URL 尾随括号剥离。"""
+    user = parse_instruction("帮我爬取 https://cn.vuejs.org/guide/introduction.html 这个页面")
+    assert user.instruction is not None
+    assert user.instruction["params"]["url"] == "https://cn.vuejs.org/guide/introduction.html"
+    # 模型输出是含 Markdown 链接的散文（URL 带尾括号），不应污染参数
+    prose = parse_instruction(
+        "# 指南\n[Vue](https://vuejs.org/)；无法访问外部内容，我不会爬取。")
+    assert prose.instruction is None or \
+        prose.instruction["params"].get("url") != "https://vuejs.org/)"
