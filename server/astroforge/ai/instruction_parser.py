@@ -114,12 +114,6 @@ def parse_instruction(model_output: str, settings: AiSettings | None = None) -> 
     if parsed is not None:
         result.instruction = parsed
         return result
-    limit = settings.instruction.max_retry if settings else 2
-    for _ in range(max(1, limit)):  # 方案约定失败重试上限（解析层面幂等，循环兜底）
-        parsed = _extract_loose(model_output)
-        if parsed is not None:
-            result.instruction = parsed
-            return result
     if settings is None or settings.instruction.fallback_keyword_mode:
         fallback = _keyword_fallback(model_output)
         if fallback is not None:

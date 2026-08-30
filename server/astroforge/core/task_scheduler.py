@@ -68,9 +68,7 @@ class TaskRecord:
             "finished_at": self.finished_at,
         }
         if include_steps:
-            data["steps"] = [
-                {k: v for k, v in step.items() if k != "cancel_event"} for step in self.steps
-            ]
+            data["steps"] = [dict(step) for step in self.steps]
         return data
 
 

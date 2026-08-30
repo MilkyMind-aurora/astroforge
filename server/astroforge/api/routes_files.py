@@ -12,8 +12,7 @@ router = APIRouter(prefix="/files", tags=["files"])
 
 
 def _whitelist_roots(ctx: deps.AppContext) -> list:
-    data_dir = ctx.settings.data_dir()
-    return [data_dir, ctx.settings.template_dir(), data_dir / "raw", data_dir / "output"]
+    return [ctx.settings.data_dir(), ctx.settings.template_dir()]
 
 
 @router.get("/browse", dependencies=[deps.TokenDep])

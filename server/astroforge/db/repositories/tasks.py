@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from astroforge.db.models import Artifact, Task, TaskStep
@@ -101,8 +101,4 @@ class TasksRepo:
                 size_bytes=size_bytes,
             )
         )
-        await self.session.commit()
-
-    async def delete_steps(self, task_uuid: uuid.UUID) -> None:
-        await self.session.execute(delete(TaskStep).where(TaskStep.task_uuid == task_uuid))
         await self.session.commit()

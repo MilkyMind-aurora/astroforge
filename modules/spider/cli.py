@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
@@ -80,7 +79,6 @@ def main() -> int:
         except Exception as exc:  # 模块崩溃不裸奔，统一转结果 JSON
             error(f"执行异常: {exc}")
             result = fail(3003, f"模块执行异常: {exc}")
-        time.sleep(0)  # 保持 request_interval 由 fetch/site 内部控制
     save_json(args.output, result)
     return 0 if result["code"] == 0 else 1
 

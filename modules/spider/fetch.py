@@ -59,18 +59,30 @@ def _http_get(url: str, timeout: int = 30) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
+def fetch_html(url: str) -> str:
+    """抓取原始 HTML（Scrapling 优先，回退 urllib）。"""
+    if SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
+        return _ScraplingFetcher().get(url).html_content
+    return _http_get(url)
+
+
+def html_to_md(html: str) -> tuple[str, str]:
+    """从 HTML 提取 (正文文本, 标题)。"""
+    parser = _TextExtractor()
+    parser.feed(html)
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(parser.chunks))
+    return text, parser.title.strip() or ""
+
+
 def fetch_page_text(url: str) -> tuple[str, str]:
-    """返回 (正文文本, 标题)。优先 Scrapling。"""
+    """返回 (正文文本, 标题)。fetch_html + html_to_md 组合。"""
     if SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
         page = _ScraplingFetcher().get(url)
         title = page.css_first("title::text") or url
         body = "\n".join(p.strip() for p in page.css("p::text") if p.strip())
         return body or title, title
-    html = _http_get(url)
-    parser = _TextExtractor()
-    parser.feed(html)
-    text = re.sub(r"\n{3,}", "\n\n", "\n".join(parser.chunks))
-    return text, parser.title.strip() or url
+    text, title = html_to_md(_http_get(url))
+    return text, title or url
 
 
 PDF_LINK_RE = re.compile(r'href="([^"]+\.pdf)"', re.IGNORECASE)

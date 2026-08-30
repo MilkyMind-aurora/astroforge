@@ -1,7 +1,7 @@
 """FastAPI 依赖：从 app.state 取运行时单例；token 校验（方案 2.4 机制 12）。"""
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, Header, Request
 
@@ -59,7 +59,3 @@ def ws_token_ok(request: Request, token: str | None) -> bool:
     """WS 认证：?token= 查询参数校验。"""
     ctx: AppContext = request.app.state.context
     return bool(token) and token == ctx.token
-
-
-def get_openapi_security() -> dict[str, Any]:
-    return {"X-AstroForge-Token": {"in": "header", "name": "X-AstroForge-Token", "type": "apiKey"}}
