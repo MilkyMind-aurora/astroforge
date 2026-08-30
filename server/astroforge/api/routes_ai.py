@@ -97,6 +97,14 @@ async def chat(body: ChatBody, ctx: deps.CtxDep) -> dict:
     from astroforge.ai.instruction_parser import parse_instruction
 
     result = parse_instruction(model_output, ctx.settings.ai)
+    if result.instruction is None:
+        # 用户消息命中动作词时直接关键词派发（2B 模型跑偏兜底）
+        user_result = parse_instruction(body.message, ctx.settings.ai)
+        if user_result.instruction is not None:
+            result = user_result
+            result.fallback = True
+            if ctx.settings.ai.instruction.fallback_notice:
+                result.dropped_notes.append("⚠️ AI 走神了，已用快捷模式执行，建议检查参数")
     task_uuid = None
     instruction_json = result.instruction
     if instruction_json is not None:

@@ -78,6 +78,25 @@ async def health():
     return {"ok": True, "model_loaded": _state["model"] is not None, "current_model": _state["model_key"]}
 
 
+def _system_prompt() -> str:
+    """系统提示词：env ASTROFORGE_SYSTEM_PROMPT 指定路径（方案 3.7 行为边界）。"""
+    default = Path(__file__).resolve().parents[2] / "config" / "ai_system_prompt.txt"
+    path = Path(os.environ.get("ASTROFORGE_SYSTEM_PROMPT", str(default)))
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return "你是 AstroForge 的 AI 副驾驶，负责把用户意图解析为结构化任务指令。"
+
+
+def _chat(messages: list[dict], max_tokens: int, stream: bool = False):
+    """Chat 模板补全（裸补全会复述提示词，指令准确率骤降）。"""
+    return _state["model"].create_chat_completion(
+        messages=[{"role": "system", "content": _system_prompt()},
+                  {"role": "user", "content": messages}],
+        max_tokens=max_tokens, stream=stream,
+    )
+
+
 @app.post("/v1/model/load")
 async def load_model(body: ModelBody):
     if body.model_key not in MODEL_FILES:
@@ -109,8 +128,8 @@ async def infer(body: InferBody):
         raise HTTPException(status_code=503, detail={"code": 3005, "message": "模型未加载"})
     _state["last_used"] = time.time()
     with _lock:
-        output = _state["model"](body.prompt, max_tokens=body.max_tokens, echo=False)
-    return {"text": output["choices"][0]["text"]}
+        output = _chat(body.prompt, body.max_tokens)
+    return {"text": output["choices"][0]["message"]["content"]}
 
 
 @app.post("/v1/infer_stream")
@@ -120,9 +139,10 @@ async def infer_stream(body: InferBody):
     _state["last_used"] = time.time()
 
     async def _sse():
-        stream = _state["model"](body.prompt, max_tokens=body.max_tokens, echo=False, stream=True)
+        stream = _chat(body.prompt, body.max_tokens, stream=True)
         for chunk in stream:
-            token = chunk["choices"][0].get("text", "")
+            choice = chunk["choices"][0]
+            token = choice.get("text") or (choice.get("delta") or {}).get("content", "")
             if token:
                 yield f"data: {json.dumps({'text': token}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"

@@ -224,6 +224,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     continue
                 model_output = "".join(chunks)
                 result = parse_instruction(model_output, ctx.settings.ai)
+                if result.instruction is None:
+                    # 用户消息本身命中动作词时直接关键词派发（2B 模型跑偏兜底，
+                    # 方案附录补丁 1 第三层的用户侧延伸）
+                    user_result = parse_instruction(message, ctx.settings.ai)
+                    if user_result.instruction is not None:
+                        result = user_result
+                        result.fallback = True
+                        if ctx.settings.ai.instruction.fallback_notice:
+                            result.dropped_notes.append(
+                                "⚠️ AI 走神了，已用快捷模式执行，建议检查参数")
                 task_uuid = None
                 instruction_json = result.instruction
                 if instruction_json is not None:
