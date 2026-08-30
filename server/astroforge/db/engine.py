@@ -16,7 +16,7 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 def build_database_url(db: DatabaseSettings) -> str:
     password = db.password()
     return (
-        f"postgresql+asyncpg://{db.user}:{password}@{db.host}:{db.port}/{db.db_name}"
+        f"postgresql+asyncpg://{db.db_user}:{password}@{db.host}:{db.port}/{db.db_name}"
     )
 
 

@@ -118,7 +118,8 @@ class Scheduler:
         if mode == "standalone" and task_type not in MODULE_MAP:
             raise ValueError(f"未知任务类型: {task_type}")
         record = TaskRecord(
-            task_uuid=uuid_lib.uuid4().hex,
+            # 标准带连字符 UUID：与 PostgreSQL uuid 列表示一致，双端统一
+            task_uuid=str(uuid_lib.uuid4()),
             task_type=task_type,
             mode=mode,
             title=title or task_type,
@@ -214,7 +215,8 @@ class Scheduler:
                 break
             env_name, script_rel = mapping
             step["status"] = "running"
-            step_config = dict(record.config)
+            # 模块 CLI 契约要求 task_type 在配置内（方案 3.8 模块接口约定）
+            step_config = {"task_type": task_type, **dict(record.config)}
             if record.mode == "pipeline":
                 pipeline = self.engine.get(record.config.get("pipeline", ""))
                 if pipeline is not None:
