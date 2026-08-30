@@ -20,7 +20,7 @@ app/.packages
 app/build/
 app/windows/flutter/ephemeral/
 app/macos/Flutter/ephemeral/
-app/pubspec.lock
+# pubspec.lock 保留在版本控制：保证 CI analyze/test 可复现（方案 3.10）
 **/GeneratedPluginRegistrant.*
 **/Generated.xcconfig
 app/.idea/
