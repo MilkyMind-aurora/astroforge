@@ -60,6 +60,25 @@ class ApiClient {
     if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
     return const [];
   }
+
+  /// 设置中心（Phase 1.3.3）：配置摘要 + 覆盖设置。
+  Future<Map<String, dynamic>> configSummary() async {
+    final data = _unwrap(await _dio.get('/api/v1/system/config-summary'));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> listAppSettings() async {
+    final data = _unwrap(await _dio.get('/api/v1/app-settings'));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  Future<void> setAppSetting(String key, Object value) async {
+    await _dio.put('/api/v1/app-settings/$key', data: {'value': value});
+  }
+
+  Future<void> resetToken() async {
+    await _dio.post('/api/v1/service/token/reset');
+  }
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
