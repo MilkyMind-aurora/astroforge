@@ -37,7 +37,9 @@ def test_password_env_missing_raises(tmp_settings: Path, monkeypatch):
         settings.database.password()
 
 
-def test_dotted_override_conflict_raises(tmp_path: Path):
+def test_dotted_override_conflict_raises(tmp_path: Path, monkeypatch):
+    # 平台覆盖仅在匹配平台上应用；固定 windows 分支使断言与运行平台无关
+    monkeypatch.setattr(sys, "platform", "win32")
     config = tmp_path / "s.yaml"
     config.write_text(
         """

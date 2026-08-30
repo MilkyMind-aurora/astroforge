@@ -28,10 +28,10 @@ app/.idea/
 # ---- Node ----
 node_modules/
 
-# ---- 运行时数据（不入库）----
-data/
-models/*.gguf
-templates/*.docx
+# ---- 运行时数据（不入库；锚定仓库根，避免误伤 app/lib/data 等源码目录）----
+/data/
+/models/*.gguf
+/templates/*.docx
 
 # ---- 工具状态目录 ----
 .codegraph/

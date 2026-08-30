@@ -9,6 +9,10 @@ import re
 import sys
 from pathlib import Path
 
+# Windows CI 控制台非 UTF-8 编码，强制统一避免 ✅/❌ 输出崩溃
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {
     ".git", ".venv", "venv", "__pycache__", "node_modules", "build", "dist",
