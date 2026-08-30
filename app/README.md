@@ -1,17 +1,33 @@
-# astroforge
+# AstroForge Flutter 桌面端
 
-A new Flutter project.
+对接 Sidereal Core（127.0.0.1:8420）的图形客户端，编译目标：**windows + macos**（方案 3.10）。
 
-## Getting Started
+## 开发运行
 
-This project is a starting point for a Flutter application.
+```bash
+cd app
+flutter pub get
+flutter run -d windows   # 或 -d macos
+```
 
-A few resources to get you started if this is your first Flutter project:
+## 已实现（骨架阶段）
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- 星尘主题（明暗双套，Material 3）与 NavigationRail 8 页外壳
+- Dio API 客户端（X-AstroForge-Token 注入 + 统一信封解析）
+- WebSocket 客户端（指数退避重连 1s→60s + 45s 心跳超时）
+- 首页真实调用 /system/health + /system/env-check，含连接引导态
+- 监控页 fl_chart 曲线骨架（演示数据流，WS 接入属 Phase 9.5）
+- AI 抽屉占位（流式气泡/指令卡片属 Phase 9.6）
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 已知限制（本地开发）
+
+- **中文路径**：当前 Dart analysis server 在含中文的项目路径下会崩溃
+  （LSP JSON 截断）。本地 analyze/test 请把 `lib/ test/ pubspec.yaml analysis_options.yaml`
+  复制到 ASCII 路径的工程副本中执行；CI（GitHub Actions）为 ASCII 路径不受影响。
+- `flutter create` 生成的 windows/macos runner 已入库；打包（Inno Setup / dmg）属 Phase 9.8。
+
+## 测试
+
+```bash
+flutter test
+```
