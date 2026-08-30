@@ -4,19 +4,22 @@
 仅用标准库 html.parser，零第三方依赖。通用启发式（对 VitePress 系文档站
 ——如 cn.vuejs.org——实测有效，对常见 doc 站具备泛化性）：
 
-1. 侧边栏容器定位（预扫描定优先级，避免顶部导航抢注）：
-   a. class 含 "sidebar" 的元素（如 <aside class="VPSidebar">）；
-   b. 否则第一个 <aside>；
-   c. 否则第一个 <nav>（class 命中 navbar/menu/header/footer/outline/toc
-      等顶部导航特征时排除）。
-   三者都找不到 → 返回 []，由调用方回落 BFS。
-2. 一级章节（level=1）：容器内「标题元素」的可见文本。标题元素 = h2-h6/
-   summary/dt 标签，或 class 含 title/heading/caption 的 p/div/span/li/
-   section；章节若是链接（标题元素内含 <a>）则带 url。
-3. 页面条目（level=2）：容器内其余 <a href> + 可见文本作标题；链接经
-   urljoin 转绝对地址并去掉 #fragment。
-4. group 容器（class 含 group/section 等）不单独输出——分组交给
-   group_by_top_level 按文档扫描顺序（章节标题出现即开新组）完成。
+1. 侧边栏容器定位（先扫描全页开标签，再按优先级选定唯一容器）：
+   a. 第一个「class 含 sidebar 词条」的 <aside>（如 <aside class="VPSidebar">）；
+   b. 第一个「class 含 sidebar 词条」的块级容器（div/section/nav/ul/ol）；
+   c. 其余「class 含 sidebar 词条」的元素；
+   d. 第一个 <aside>；
+   e. 第一个 <nav>（class 命中 navbar/menu/header/footer/outline/toc 等
+      顶部导航特征时排除）。
+   词条级匹配会排除 has-sidebar / with-sidebar 这类「布局状态类」（常见于
+   导航栏与内容包裹层，非侧边栏本体）。一个都不满足 → 返回 []。
+2. 容器闭合后立即停止收集：绝不因后续元素（如 class="has-sidebar" 的内容
+   包裹层）再次开容器，避免正文标题混入章节。
+3. 一级章节（level=1）：容器内「标题元素」的可见文本（h2-h6/summary/dt，
+   或 class 含 title/heading/caption 的 p/div/span/li/section）；标题内含
+   <a> 时章节自带 url。
+4. 页面条目（level=2）：容器内其余 <a href> + 可见文本作标题；链接经
+   urljoin 转绝对地址并去掉 #fragment。纯符号文本（如 "?" 切换按钮）丢弃。
 """
 from __future__ import annotations
 
@@ -24,13 +27,12 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urldefrag, urljoin, urlparse
 
-# 未归入任何一级章节的页面落到此组（parse 顺序在首个章节标题之前）
+# 未归入任何一级章节的页面落到此组（扫描顺序在首个章节标题之前）
 UNGROUPED_KEY = "(未分组)"
 
-# 预扫描：判断页面里是否存在「class 含 sidebar」的元素（带单/双引号两种写法）
-_CLASS_SIDEBAR_RE = re.compile(r'class\s*=\s*["\'][^"\']*sidebar', re.IGNORECASE)
-_ASIDE_RE = re.compile(r"<aside[\s>]", re.IGNORECASE)
-_NAV_RE = re.compile(r"<nav[\s>]", re.IGNORECASE)
+# 「布局状态类」：token 以 xxx-sidebar 结尾（has-sidebar/with-sidebar 等），
+# 出现在导航栏/内容包裹层上，不是侧边栏本体
+_STATE_SIDEBAR_RE = re.compile(r"[a-z0-9]+-sidebar$")
 # 顶部导航特征类名：命中则不把该 <nav> 当侧边栏容器
 _NAV_EXCLUDE_RE = re.compile(
     r"navbar|menu|header|footer|outline|toc|breadcrumb|pagination|tabs?", re.IGNORECASE
@@ -50,6 +52,8 @@ _VOID_TAGS = frozenset(
 )
 # 允许保留为页面/章节条目的协议
 _ALLOWED_SCHEMES = {"http", "https"}
+# 词条级容器候选偏好的块级标签（tier b）
+_BLOCK_TAGS = frozenset({"div", "section", "nav", "ul", "ol"})
 
 
 def _attr(attrs: list[tuple[str, str | None]], name: str) -> str:
@@ -65,29 +69,68 @@ def _normalize_text(raw: str) -> str:
     return re.sub(r"\s+", " ", raw).strip()
 
 
-def _container_rule(html: str) -> str | None:
-    """预扫描确定容器定位规则（优先级：sidebar 类名 > aside > nav）。"""
-    if _CLASS_SIDEBAR_RE.search(html):
-        return "class"
-    if _ASIDE_RE.search(html):
-        return "aside"
-    if _NAV_RE.search(html):
-        return "nav"
+def _sidebar_token(classes: str) -> str | None:
+    """返回 class 里首个「真侧边栏」词条；状态类（xxx-sidebar）不算。"""
+    for token in classes.split():
+        low = token.lower()
+        if "sidebar" in low and not _STATE_SIDEBAR_RE.match(low):
+            return token
+    return None
+
+
+class _TagScanner(HTMLParser):
+    """预扫描：按文档顺序记录全部开标签的 (tag, class)，供容器选型。"""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tags: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:  # type: ignore[name-defined]
+        self.tags.append((tag, _attr(attrs, "class")))
+
+    def handle_startendtag(self, tag: str, attrs) -> None:  # type: ignore[name-defined]
+        self.tags.append((tag, _attr(attrs, "class")))
+
+
+def _choose_container(tags: list[tuple[str, str]]) -> tuple[str, str | None] | None:
+    """按 tier 优先级选定唯一侧边栏容器，返回 (标签, class 原文或 None)。"""
+    # a. 第一个「aside + sidebar 词条」
+    for tag, classes in tags:
+        if tag == "aside" and _sidebar_token(classes):
+            return tag, classes
+    # b. 第一个「块级容器 + sidebar 词条」
+    for tag, classes in tags:
+        if tag in _BLOCK_TAGS and _sidebar_token(classes):
+            return tag, classes
+    # c. 其余「sidebar 词条」元素（非块级、非 aside）
+    for tag, classes in tags:
+        if _sidebar_token(classes):
+            return tag, classes
+    # d. 第一个裸 <aside>
+    for tag, classes in tags:
+        if tag == "aside":
+            return tag, None
+    # e. 第一个非顶部导航的裸 <nav>
+    for tag, classes in tags:
+        if tag == "nav" and not _NAV_EXCLUDE_RE.search(classes):
+            return tag, None
     return None
 
 
 class _SidebarParser(HTMLParser):
-    """单遍流式解析：先锁定容器，再在容器内收集章节标题与页面链接。"""
+    """单遍流式解析：进入选定容器收集章节标题与页面链接，闭合即止。"""
 
-    def __init__(self, rule: str, base_url: str) -> None:
+    def __init__(self, container: tuple[str, str | None], base_url: str) -> None:
         super().__init__(convert_charrefs=True)
-        self.rule = rule
+        self.want_tag, self.want_classes = container
+        self.want_tokens = frozenset(self.want_classes.lower().split()) if self.want_classes else None
         self.base_url = base_url
         self.items: list[dict] = []
-        # 开标签栈：tag 与 class 平行，用于容器/标题闭合判定
+        # 开标签栈：tag 与 class 平行，用于标题/链接闭合判定
         self.stack: list[str] = []
         self.stack_classes: list[str] = []
         self.container_depth: int | None = None
+        self.container_done = False
         self.skip_depth = 0
         # 当前捕获中的章节标题（title_depth = 标题元素入栈后的栈深）
         self.title_depth: int | None = None
@@ -101,12 +144,11 @@ class _SidebarParser(HTMLParser):
 
     # ---- 判定辅助 -------------------------------------------------------
     def _matches_container(self, tag: str, classes: str) -> bool:
-        if self.rule == "class":
-            return "sidebar" in classes.lower()
-        if self.rule == "aside":
-            return tag == "aside"
-        # rule == "nav"
-        return tag == "nav" and not _NAV_EXCLUDE_RE.search(classes)
+        if tag != self.want_tag:
+            return False
+        if self.want_tokens is None:
+            return True  # 裸 aside/nav：首个匹配即容器
+        return frozenset(classes.lower().split()) == self.want_tokens
 
     def _is_title_element(self, tag: str, classes: str) -> bool:
         if tag in _TITLE_TAGS:
@@ -153,8 +195,8 @@ class _SidebarParser(HTMLParser):
             if text and not self.title_url:
                 self.title_url = self._abs_url(href) or ""
             return
-        if not text:
-            return
+        if not text or not re.search(r"\w", text, re.UNICODE):
+            return  # 空文本 / 纯符号（"?" 切换按钮等）丢弃
         url = self._abs_url(href)
         if url is None:
             return
@@ -166,7 +208,7 @@ class _SidebarParser(HTMLParser):
         text = _normalize_text("".join(self.title_buf))
         url = self.title_url
         self.title_depth, self.title_buf, self.title_url = None, [], ""
-        if text:
+        if text and re.search(r"\w", text, re.UNICODE):
             self._emit_chapter(text, url)
 
     # ---- HTMLParser 事件 -------------------------------------------------
@@ -175,6 +217,8 @@ class _SidebarParser(HTMLParser):
         href = _attr(attrs, "href")
         is_void = tag in _VOID_TAGS
 
+        if self.container_done:
+            return
         if self.container_depth is None:
             if self._matches_container(tag, classes):
                 self.container_depth = len(self.stack) + 1
@@ -198,13 +242,18 @@ class _SidebarParser(HTMLParser):
             return
         if self.link_depth is not None:
             return  # 链接内部普通标签：仅待文本收集
-        if self.title_depth is None and self.link_depth is None and self._is_title_element(tag, classes):
+        if self.title_depth is None and self._is_title_element(tag, classes):
             self.title_depth = len(self.stack)
             self.title_buf = []
             self.title_url = ""
 
+    def handle_startendtag(self, tag: str, attrs) -> None:  # type: ignore[name-defined]
+        # 自闭合标签（如 <div class="curtain"/>）：入栈即出栈，等价一次开合
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
+
     def handle_endtag(self, tag: str) -> None:
-        if self.container_depth is None:
+        if self.container_done or self.container_depth is None:
             return
         if tag in _VOID_TAGS or tag not in self.stack:
             return  # 游离闭合标签：忽略（栈配对容错）
@@ -221,12 +270,15 @@ class _SidebarParser(HTMLParser):
         # 章节标题闭合
         if self.title_depth is not None and len(self.stack) < self.title_depth:
             self._emit_pending_chapter()
-        # 侧边栏容器闭合：此后不再收集（多容器页面只认第一个）
+        # 侧边栏容器闭合：此后永久停止（不再匹配新容器）
         if len(self.stack) < self.container_depth:
             self.container_depth = None
+            self.container_done = True
 
     def handle_data(self, data: str) -> None:
-        if self.skip_depth or self.container_depth is None:
+        if self.container_done or self.container_depth is None:
+            return
+        if self.skip_depth:
             return
         if self.link_depth is not None:
             self.link_buf.append(data)
@@ -242,10 +294,16 @@ def parse_sidebar(html: str, base_url: str) -> list[dict]:
     """
     if not html or not isinstance(html, str):
         return []
-    rule = _container_rule(html)
-    if rule is None:
+    scanner = _TagScanner()
+    try:
+        scanner.feed(html)
+        scanner.close()
+    except Exception:  # 预扫描失败按「无侧边栏」处理
         return []
-    parser = _SidebarParser(rule, base_url)
+    container = _choose_container(scanner.tags)
+    if container is None:
+        return []
+    parser = _SidebarParser(container, base_url)
     try:
         parser.feed(html)
         parser.close()

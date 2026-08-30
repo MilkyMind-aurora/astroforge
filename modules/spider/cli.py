@@ -36,6 +36,8 @@ def run_site(cfg: dict) -> dict:
         output_dir=Path(cfg.get("output_dir", "output/site")),
         max_pages=int(cfg.get("max_pages", 200)),
         interval=float(cfg.get("request_interval", 1.0)),
+        # 结构化侧边栏模式默认开启；cfg["structured"]=false 时走纯 BFS
+        structured=bool(cfg.get("structured", True)),
     )
 
 
