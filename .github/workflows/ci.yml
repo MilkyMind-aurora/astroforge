@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: Python（lint + 测试 + 安全守卫） ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装服务核心依赖
+        run: pip install -e "server[dev]"
+      - name: Ruff lint
+        run: ruff check server scripts
+      - name: 单元测试
+        run: pytest server/tests -q
+      - name: SQL 参数绑定守卫（全仓扫描）
+        run: python tests/test_sql_injection_guard.py
+      - name: 导出 OpenAPI 契约
+        if: matrix.os == 'ubuntu-latest'
+        run: python scripts/export_openapi.py --output docs/openapi.json
+      - name: 上传契约产物
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: docs/openapi.json
+
+  flutter:
+    name: Flutter（analyze）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Analyze
+        working-directory: app
+        run: flutter analyze --no-fatal-infos

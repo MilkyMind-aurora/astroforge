@@ -1,0 +1,17 @@
+# 办公文档批量处理流水线（NovaFlow 内置模板）
+name: office_batch
+title: 办公文档批量处理
+description: 混合格式文件夹 → anydoc 批量转 MD → 可选合并转正式报告 DOCX
+version: 1
+steps:
+  - name: 批量转 Markdown
+    module: anydoc
+    task_type: anydoc
+    config: {}
+  - name: 合并转正式报告 DOCX
+    module: md2docx
+    task_type: md2docx
+    config:
+      template: formal_report
+      merge: true
+    optional: true

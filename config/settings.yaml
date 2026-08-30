@@ -1,0 +1,101 @@
+# AstroForge 全局配置（衍星台 · Sidereal Core 服务核心读取）
+# 合并规则：platform_overrides 中当前平台的同名点分键覆盖全局值（见 server/astroforge/core/config_loader.py）
+
+# ===== 服务核心 =====
+service:
+  host: "127.0.0.1"
+  port: 8420
+  token_file: "./data/service_token"
+  auto_upgrade_db: true          # 启动时自动 alembic upgrade head
+  log_level: "INFO"
+
+# ===== 数据库（PostgreSQL 主存储）=====
+database:
+  host: "127.0.0.1"
+  port: 5432
+  db_name: "astroforge"
+  db_user: "astroforge"
+  password_env: "ASTROFORGE_PG_PASSWORD"   # 密码仅从环境变量读取，不落明文
+  pool_size: 10
+  max_overflow: 5
+  pool_pre_ping: true
+  pool_recycle: 3600
+
+# ===== AI 引擎独立进程 =====
+ai_engine:
+  base_url: "http://127.0.0.1:8421"
+  restart_limit: 3               # 引擎崩溃自动重启上限
+
+# ===== AI 副驾驶 =====
+ai:
+  enabled: true
+  default_model: "qwen2b"
+  model_path:
+    qwen2b: "./models/qwen3.8-2b-q4_k_m.gguf"
+    ornith9b: "./models/ornith-9b-q4.gguf"
+  n_ctx: 4096
+  n_threads: 4
+  idle_unload: true
+  idle_timeout: 300              # 闲置5分钟自动卸载
+  system_prompt: "./config/ai_system_prompt.txt"
+  instruction:                   # 三层降级策略（方案附录补丁1）
+    max_retry: 2
+    fallback_keyword_mode: true
+    fallback_notice: true
+
+# ===== 浏览器（Scrapling；平台差异见 platform_overrides）=====
+browser:
+  headless: true
+  timeout: 30000
+  request_interval: 1.0
+  auto_retry: 3
+  solve_cloudflare: true
+  no_sandbox: true               # Windows 强制 true；macOS 默认 false
+
+# ===== MinerU =====
+mineru:
+  model_source: "modelscope"
+  backend: "pipeline"
+  max_threads: 4
+
+# ===== MD 转 DOCX =====
+md2docx:
+  template_dir: "./templates/"
+  default_template: "tech_doc"
+  enable_toc: true
+  enable_page_number: true
+
+# ===== 监控（NovaFlow 看板数据源）=====
+monitor:
+  refresh_interval: 1            # WS 推送节流（秒）
+  aggregate_interval: 10         # 聚合入库粒度（秒）
+  memory_warning_gb: 10
+  memory_critical_gb: 12
+  show_curve: true
+  history_hours: 24              # monitor_metrics 保留时长
+  jsonl_export: false            # 可选 JSONL 导出开关
+  jsonl_dir: "./data/monitor/"
+
+# ===== 全局限制 =====
+system:
+  max_memory_gb: 12
+  task_concurrency: 1
+  data_dir: "./data/"
+  mascot_enabled: true
+
+# ===== 平台覆盖（同名键覆盖全局值）=====
+platform_overrides:
+  windows:
+    browser.chromium_path: "D:/Apps/ModelingAndProgramming/pw_local_browser/chrome-win64/chrome.exe"
+    mineru.model_dir: "D:/Apps/ModelingAndProgramming/mineru/models/"
+    mineru.modelscope_cache: "C:/Users/Lenovo/.cache/modelscope/models/"
+    ai.model_path.qwen2b: "D:/Apps/ModelingAndProgramming/astroforge/models/qwen3.8-2b-q4_k_m.gguf"
+    ai.model_path.ornith9b: "D:/Apps/ModelingAndProgramming/astroforge/models/ornith-9b-q4.gguf"
+    system.data_dir: "D:/Apps/ModelingAndProgramming/astroforge/data/"
+  macos:
+    browser.chromium_path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    mineru.model_dir: "~/Library/Application Support/AstroForge/models/"
+    mineru.modelscope_cache: "~/.cache/modelscope/models/"
+    ai.model_path.qwen2b: "~/Library/Application Support/AstroForge/models/qwen3.8-2b-q4_k_m.gguf"
+    ai.model_path.ornith9b: "~/Library/Application Support/AstroForge/models/ornith-9b-q4.gguf"
+    system.data_dir: "~/Library/Application Support/AstroForge/data/"

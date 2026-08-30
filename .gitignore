@@ -1,0 +1,46 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---- Flutter / Dart ----
+app/.dart_tool/
+app/.flutter-plugins*
+app/.packages
+app/build/
+app/windows/flutter/ephemeral/
+app/macos/Flutter/ephemeral/
+app/pubspec.lock
+**/GeneratedPluginRegistrant.*
+**/Generated.xcconfig
+app/.idea/
+
+# ---- Node ----
+node_modules/
+
+# ---- 运行时数据（不入库）----
+data/
+models/*.gguf
+templates/*.docx
+
+# ---- 工具状态目录 ----
+.codegraph/
+.deepsec/
+.mimosa/
+
+# ---- IDE / OS ----
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store

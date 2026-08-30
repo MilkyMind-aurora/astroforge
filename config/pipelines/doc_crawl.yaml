@@ -1,0 +1,16 @@
+# 官方文档采集流水线（NovaFlow 内置模板）
+name: doc_crawl
+title: 官方文档采集
+description: 文档站 URL → 整站结构化爬取 → 按章节输出 Markdown → 可选批量转技术文档 DOCX
+version: 1
+steps:
+  - name: 整站爬取
+    module: spider
+    task_type: spider_site
+    config: {}
+  - name: 批量转技术文档 DOCX
+    module: md2docx
+    task_type: md2docx
+    config:
+      template: tech_doc
+    optional: true

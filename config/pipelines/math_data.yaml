@@ -1,0 +1,16 @@
+# 数模数据采集流水线（NovaFlow 内置模板）
+name: math_data
+title: 数模数据采集
+description: 数据页面 URL → 表格批量爬取 → CSV 清洗合并 → 数模报告模板 DOCX
+version: 1
+steps:
+  - name: 表格批量爬取
+    module: spider
+    task_type: spider_table
+    config: {}
+  - name: 生成数模报告 DOCX
+    module: md2docx
+    task_type: md2docx
+    config:
+      template: math_model
+    optional: true

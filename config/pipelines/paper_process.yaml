@@ -1,0 +1,21 @@
+# 学术论文全处理流水线（NovaFlow 内置模板）
+name: paper_process
+title: 学术论文全处理
+description: PDF 输入 → MinerU 解析 → WPD 提取图表数据 → 完整 Markdown → 可选学术论文 DOCX
+version: 1
+steps:
+  - name: 解析文档
+    module: mineru
+    task_type: mineru
+    config: {}
+  - name: 提取图表数据
+    module: wpd
+    task_type: wpd
+    config: {}
+    optional: true          # 无量化图表时可跳过
+  - name: 转学术论文 DOCX
+    module: md2docx
+    task_type: md2docx
+    config:
+      template: academic
+    optional: true
