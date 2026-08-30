@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter
 
 from astroforge.api import deps
-from astroforge.api.response import ok
+from astroforge.api.response import ApiError, ErrorCode, ok
 from astroforge.core.env_manager import run_env_check
 
 router = APIRouter(tags=["system"])
@@ -68,3 +68,71 @@ async def reset_token(ctx: deps.CtxDep) -> dict:
     ctx.token = secrets.token_hex(32)
     token_path.write_text(ctx.token, encoding="utf-8")
     return ok({"token_file": str(token_path)})
+
+
+# ---- 设置中心（方案 1.3.3）----
+
+# 可写键白名单：更新键不得来自客户端字符串直通（方案 8.4）
+WRITABLE_KEYS: dict[str, tuple] = {
+    "default_template": (str,),
+    "mascot_enabled": (bool,),
+    "memory_warning_gb": (int, float),
+    "memory_critical_gb": (int, float),
+    "request_interval": (int, float),
+}
+
+
+@router.get("/system/config-summary", dependencies=[deps.TokenDep])
+async def config_summary(ctx: deps.CtxDep) -> dict:
+    """当前生效配置摘要（脱敏：不含任何密码/凭据字段）。"""
+    s = ctx.settings
+    return ok({
+        "service": {"host": s.service.host, "port": s.service.port},
+        "database": {"host": s.database.host, "port": s.database.port,
+                     "db_name": s.database.db_name, "db_user": s.database.db_user},
+        "md2docx": {"default_template": s.md2docx.default_template},
+        "monitor": {"memory_warning_gb": s.monitor.memory_warning_gb,
+                    "memory_critical_gb": s.monitor.memory_critical_gb,
+                    "refresh_interval": s.monitor.refresh_interval,
+                    "history_hours": s.monitor.history_hours},
+        "ai": {"enabled": s.ai.enabled, "default_model": s.ai.default_model,
+               "idle_timeout": s.ai.idle_timeout},
+        "system": {"max_memory_gb": s.system.max_memory_gb,
+                   "task_concurrency": s.system.task_concurrency,
+                   "mascot_enabled": s.system.mascot_enabled},
+    })
+
+
+@router.get("/app-settings", dependencies=[deps.TokenDep])
+async def list_app_settings() -> dict:
+    """读用户覆盖设置（app_settings 表；DB 不可用返回空集）。"""
+    try:
+        from astroforge.db import engine as db_engine
+        from astroforge.db.repositories import app_settings as settings_repo
+
+        async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+            items = await settings_repo.list_all(session, WRITABLE_KEYS)
+        return ok({"items": items})
+    except Exception:
+        return ok({"items": {}, "note": "数据库不可用，覆盖设置未生效"})
+
+
+@router.put("/app-settings/{key}", dependencies=[deps.TokenDep])
+async def set_app_setting(key: str, ctx: deps.CtxDep, value: dict) -> dict:
+    """写覆盖设置：键走白名单，值经 ORM 参数化写入（方案 8.4）。"""
+    if key not in WRITABLE_KEYS:
+        allowed = ", ".join(sorted(WRITABLE_KEYS))
+        raise ApiError(ErrorCode.MISSING_PARAM, f"不可写键: {key}（白名单: {allowed}）")
+    expected = WRITABLE_KEYS[key]
+    raw = value.get("value") if isinstance(value, dict) and "value" in value else value
+    if not isinstance(raw, expected):
+        raise ApiError(ErrorCode.MISSING_PARAM, f"键 {key} 的值类型不符")
+    try:
+        from astroforge.db import engine as db_engine
+        from astroforge.db.repositories import app_settings as settings_repo
+
+        async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+            await settings_repo.put_value(session, key, {"value": raw})
+        return ok({"key": key, "value": raw})
+    except Exception as exc:
+        raise ApiError(ErrorCode.DB_UNAVAILABLE, f"数据库不可用，设置未保存: {exc}") from exc

@@ -32,11 +32,21 @@ class MonitorCollector:
             maxlen=_AGGREGATE_PER_HOUR * max(1, settings.monitor.history_hours)
         )
         self._acc: list[dict[str, Any]] = []
+        self._db_enabled = False          # 尽力落库：DB 不可达退内存态
+        self._db_warned = False
+        self._last_cleanup = 0.0
 
     def start(self) -> None:
         if not memory_monitor.PSUTIL_AVAILABLE:
             log.warning("psutil 未安装，监控采集关闭")
             return
+        try:
+            from astroforge.db import engine as db_engine
+
+            db_engine.get_sessionmaker()
+            self._db_enabled = True
+        except Exception:
+            self._db_enabled = False
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._loop(), name="astroforge-monitor")
 
@@ -55,6 +65,10 @@ class MonitorCollector:
                 self._acc.append(sample)
                 if len(self._acc) >= self.settings.monitor.aggregate_interval:
                     self._flush_aggregate()
+            # 每小时清理 24h 前的时序数据（方案 3.9 保留策略）
+            if self._db_enabled and time.time() - self._last_cleanup > 3600:
+                self._last_cleanup = time.time()
+                self._cleanup_old()
             await asyncio.sleep(max(1, self.settings.monitor.refresh_interval))
 
     def _flush_aggregate(self) -> None:
@@ -69,7 +83,81 @@ class MonitorCollector:
         )
         self._aggregates.append(point)
         self._acc.clear()
-        # TODO(Phase 1.2.2): 异步批量写入 monitor_metrics 表（复用 db/engine 会话）
+        self._persist_metric(point)
+
+    def _persist_metric(self, point: tuple[float, float, float, float]) -> None:
+        """聚合点异步落库 monitor_metrics（尽力，失败退内存态，只告警一次）。"""
+        if not self._db_enabled:
+            return
+
+        async def _write() -> None:
+            try:
+                from datetime import datetime, timezone
+
+                from astroforge.db import engine as db_engine
+                from astroforge.db.models import MonitorMetric
+
+                async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+                    session.add(MonitorMetric(
+                        metric_time=datetime.fromtimestamp(point[0], tz=timezone.utc),
+                        cpu_percent=point[1], mem_used_gb=point[2], mem_percent=point[3],
+                    ))
+                    await session.commit()
+            except Exception as exc:
+                self._db_enabled = False
+                if not self._db_warned:
+                    self._db_warned = True
+                    log.warning("监控落库失败（退内存态）: %s", exc)
+
+        asyncio.get_running_loop().create_task(_write())
+
+    def _cleanup_old(self) -> None:
+        async def _clean() -> None:
+            try:
+                from datetime import datetime, timedelta, timezone
+
+                from sqlalchemy import delete
+
+                from astroforge.db import engine as db_engine
+                from astroforge.db.models import MonitorMetric
+
+                cutoff = datetime.now(timezone.utc) - timedelta(
+                    hours=self.settings.monitor.history_hours
+                )
+                async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+                    await session.execute(
+                        delete(MonitorMetric).where(MonitorMetric.metric_time < cutoff)
+                    )
+                    await session.commit()
+            except Exception:
+                pass  # 清理失败不影响采集
+
+        asyncio.get_running_loop().create_task(_clean())
+
+    async def history_async(self, range_hours: int) -> list[dict[str, Any]]:
+        """历史回放：优先查 monitor_metrics 表，失败退内存缓冲。"""
+        try:
+            from datetime import datetime, timedelta, timezone
+
+            from sqlalchemy import select
+
+            from astroforge.db import engine as db_engine
+            from astroforge.db.models import MonitorMetric
+
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=range_hours)
+            async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+                rows = (await session.execute(
+                    select(MonitorMetric)
+                    .where(MonitorMetric.metric_time >= cutoff)
+                    .order_by(MonitorMetric.metric_time)
+                )).scalars()
+                return [
+                    {"time": r.metric_time.timestamp(), "cpu_percent": r.cpu_percent,
+                     "mem_used_gb": r.mem_used_gb, "mem_percent": r.mem_percent}
+                    for r in rows
+                ]
+        except Exception:
+            return self.history(range_hours)
 
     def history(self, range_hours: int) -> list[dict[str, Any]]:
         """历史回放：range=1h/6h/24h，聚合点降采样输出。"""

@@ -139,6 +139,7 @@ class Scheduler:
         self._tasks[record.task_uuid] = record
         self._queue.put_nowait(record.task_uuid)
         self._persist_status(record)
+        self._persist_create(record)
         return record
 
     def get(self, task_uuid: str) -> TaskRecord | None:
@@ -280,3 +281,47 @@ class Scheduler:
                 log.warning("任务状态落库失败（转内存态）: %s", exc)
                 self._db_available = False
         asyncio.get_running_loop().create_task(_write())
+
+    def _persist_create(self, record: TaskRecord) -> None:
+        """任务创建落库：tasks 主行 + steps（方案 1.4.4，尽力降级）。"""
+        if not self._db_available or self._sessionmaker is None:
+            return
+
+        async def _write() -> None:
+            try:
+                from astroforge.db.repositories.tasks import TasksRepo
+
+                async with self._sessionmaker() as session:  # type: ignore[misc]
+                    repo = TasksRepo(session)
+                    task = await repo.create(
+                        record.task_type, record.mode, record.title, record.config,
+                        task_uuid=uuid_lib.UUID(record.task_uuid),
+                    )
+                    for step in record.steps:
+                        await repo.add_step(
+                            task.task_uuid, step["step_index"], step["step_name"]
+                        )
+            except Exception as exc:
+                log.warning("任务创建落库失败（内存 uuid 保留）: %s", exc)
+                self._db_available = False
+        asyncio.get_running_loop().create_task(_write())
+
+    async def list_from_db(
+        self, status: str | None = None, task_type: str | None = None,
+        page: int = 1, page_size: int = 20,
+    ) -> list[dict[str, Any]]:
+        """DB 优先的历史查询（方案 1.4.4）；失败抛出让路由退化内存态。"""
+        if not self._db_available or self._sessionmaker is None:
+            raise RuntimeError("DB 不可用")
+        from astroforge.db.repositories.tasks import TasksRepo
+
+        async with self._sessionmaker() as session:  # type: ignore[misc]
+            repo = TasksRepo(session)
+            rows = await repo.list(status, task_type, page, page_size)
+            return [{
+                "task_uuid": str(r.task_uuid), "task_type": r.task_type, "mode": r.mode,
+                "title": r.title, "status": r.status, "progress": r.progress,
+                "error_code": r.error_code, "error_message": r.error_message,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+            } for r in rows]

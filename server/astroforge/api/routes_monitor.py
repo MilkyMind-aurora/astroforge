@@ -16,4 +16,5 @@ async def history(ctx: deps.CtxDep, range: str = Query(default="1h")) -> dict:
     hours = VALID_RANGES.get(range)
     if hours is None:
         raise ApiError(ErrorCode.MISSING_PARAM, f"range 仅支持 {', '.join(VALID_RANGES)}")
-    return ok({"range": range, "points": ctx.collector.history(hours)})
+    points = await ctx.collector.history_async(hours)
+    return ok({"range": range, "points": points})

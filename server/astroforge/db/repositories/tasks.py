@@ -24,9 +24,14 @@ class TasksRepo:
         self.session = session
 
     async def create(
-        self, task_type: str, mode: str, title: str | None, config: dict[str, Any]
+        self, task_type: str, mode: str, title: str | None, config: dict[str, Any],
+        task_uuid: uuid.UUID | None = None,
     ) -> Task:
-        task = Task(task_type=task_type, mode=mode, title=title, config=config, status="pending")
+        # task_uuid 由调用方指定时保持内存/DB 双写一致（调度器队列依赖该键）
+        task = Task(
+            task_uuid=task_uuid if task_uuid is not None else uuid.uuid4(),
+            task_type=task_type, mode=mode, title=title, config=config, status="pending",
+        )
         self.session.add(task)
         await self.session.commit()
         await self.session.refresh(task)

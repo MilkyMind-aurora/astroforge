@@ -48,10 +48,14 @@ async def list_tasks(
 ) -> dict:
     if status and status not in VALID_STATUS:
         raise ApiError(ErrorCode.MISSING_PARAM, f"非法状态筛选: {status}")
-    records = ctx.scheduler.list(status, task_type, page, page_size)
+    # DB 优先（PostgreSQL 主存储，方案 1.4.4）；不可达退化内存态
+    try:
+        items = await ctx.scheduler.list_from_db(status, task_type, page, page_size)
+    except Exception:
+        records = ctx.scheduler.list(status, task_type, page, page_size)
+        items = [r.to_dict(include_steps=False) for r in records]
     return ok({
-        "page": page, "page_size": page_size, "total": len(records),
-        "items": [r.to_dict(include_steps=False) for r in records],
+        "page": page, "page_size": page_size, "total": len(items), "items": items,
     })
 
 
