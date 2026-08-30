@@ -28,7 +28,8 @@ class ChatBody(BaseModel):
 
 
 async def _resolve_conversation(ctx: deps.AppContext,
-                                conversation_id: int | None) -> tuple[int, bool]:
+                                conversation_id: int | None,
+                                title: str | None = None) -> tuple[int, bool]:
     """确定会话 id：DB 优先（id 即 ai_conversations.id），失败回退内存自增。
 
     返回 (conversation_id, db_backed)。
@@ -44,7 +45,7 @@ async def _resolve_conversation(ctx: deps.AppContext,
             if conversation_id is not None:
                 conversation = await repo.get_conversation(conversation_id)
             if conversation is None:
-                conversation = await repo.create_conversation()
+                conversation = await repo.create_conversation(title=(title or "")[:40] or None)
             return conversation.id, True
     except Exception:
         if conversation_id is None:
@@ -80,7 +81,9 @@ async def chat(body: ChatBody, ctx: deps.CtxDep) -> dict:
     if not body.message.strip():
         raise ApiError(ErrorCode.MISSING_PARAM, "消息不能为空")
 
-    conversation_id, db_backed = await _resolve_conversation(ctx, body.conversation_id)
+    conversation_id, db_backed = await _resolve_conversation(
+        ctx, body.conversation_id, title=body.message
+    )
     await _append_history(ctx, conversation_id, db_backed, "user", body.message, None)
 
     from astroforge.ai.engine_client import EngineUnavailable
