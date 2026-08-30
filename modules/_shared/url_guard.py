@@ -43,7 +43,8 @@ def validate_external_url(url: str) -> str:
     if host.lower() in {"localhost"} or host.endswith(".local"):
         raise UrlGuardError(f"禁止访问本机域名: {host}")
     try:
-        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+        default_port = 443 if parsed.scheme == "https" else 80
+        infos = socket.getaddrinfo(host, parsed.port or default_port, proto=socket.IPPROTO_TCP)
     except socket.gaierror as exc:
         raise UrlGuardError(f"主机名解析失败: {host}") from exc
     for info in infos:

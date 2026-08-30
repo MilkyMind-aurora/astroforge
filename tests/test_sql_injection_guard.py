@@ -10,11 +10,16 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", "build", "dist", ".codegraph", ".deepsec", ".mimosa", "data"}
+SKIP_DIRS = {
+    ".git", ".venv", "venv", "__pycache__", "node_modules", "build", "dist",
+    ".codegraph", ".deepsec", ".mimosa", "data",
+}
 
 # 危险模式：f-string / format / % 拼接进入 SQL 语境
+# text( 前禁止有单词字符/下划线/点（排除 write_text(f 之类误报）
+_DANGER_TEXT = r"(?:^|[^\w.])text\(\s*f[\"']"
 DANGER_PATTERNS = [
-    (re.compile(r"text\(\s*f[\"']"), "f-string 传入 text()"),
+    (re.compile(_DANGER_TEXT), "f-string 传入 text()"),
     (re.compile(r"execute\(\s*f[\"']"), "f-string 直接 execute"),
     (re.compile(r"(executemany|executescript)\(\s*f[\"']"), "f-string 执行脚本"),
 ]
