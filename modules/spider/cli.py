@@ -38,6 +38,8 @@ def run_site(cfg: dict) -> dict:
         interval=float(cfg.get("request_interval", 1.0)),
         # 结构化侧边栏模式默认开启；cfg["structured"]=false 时走纯 BFS
         structured=bool(cfg.get("structured", True)),
+        # 断点续爬默认开启；cfg["resume"]=false 强制全量重爬
+        resume=bool(cfg.get("resume", True)),
     )
 
 

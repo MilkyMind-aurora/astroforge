@@ -41,35 +41,139 @@ class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_GuardedRedirectHandler)
 
 
-class _TextExtractor(HTMLParser):
-    """最小正文提取：title + 跳过 script/style 的可见文本。"""
+class _MarkdownExtractor(HTMLParser):
+    """结构化正文提取（方案 2.1.2）：HTML → Markdown。
 
-    SKIP = ("script", "style", "noscript", "head")
+    支持：标题层级(#~######)、段落、有序/无序列表、代码块(```)、
+    行内链接 [text](绝对URL)、引用块；跳过 script/style/noscript。
+    """
 
-    def __init__(self) -> None:
-        super().__init__()
+    SKIP = ("script", "style", "noscript", "template", "iframe", "svg")
+    BLOCK_TAGS = {"p", "div", "section", "article", "li", "tr", "br", "blockquote"}
+
+    def __init__(self, base_url: str = "") -> None:
+        super().__init__(convert_charrefs=True)
         self.title = ""
         self._in_title = False
         self._skip_depth = 0
-        self.chunks: list[str] = []
+        self._lines: list[str] = []
+        self._buf: list[str] = []
+        self._code: list[str] | None = None
+        self._list_stack: list[str] = []  # "ul" | "ol"
+        self._quote_depth = 0
+        self._href_stack: list[str] = []
+        self._base = base_url
 
+    # ---- 行缓冲工具 ----
+    def _flush_buf(self) -> None:
+        text = "".join(self._buf).strip()
+        self._buf = []
+        if not text:
+            return
+        if self._code is not None:
+            self._code.append(text)
+            return
+        prefix = ""
+        if self._quote_depth:
+            prefix = "> " * self._quote_depth
+        if self._list_stack:
+            marker = "-" if self._list_stack[-1] == "ul" else "1."
+            prefix += f"{marker} "
+        self._lines.append(prefix + text)
+
+    def _newline(self) -> None:
+        self._flush_buf()
+        if self._lines and self._lines[-1] != "":
+            self._lines.append("")
+
+    # ---- 解析事件 ----
     def handle_starttag(self, tag: str, attrs) -> None:  # type: ignore[name-defined]
         if tag == "title":
             self._in_title = True
         if tag in self.SKIP:
             self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        href = dict(attrs).get("href")
+        if tag == "a" and href:
+            self._flush_buf()
+            self._href_stack.append((len(self._buf), urljoin(self._base, href) if self._base else href))
+        elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._flush_buf()
+            self._newline()
+            self._buf.append("#" * int(tag[1]) + " ")
+        elif tag == "pre":
+            self._flush_buf()
+            self._newline()
+            self._code = []
+        elif tag == "ul":
+            self._flush_buf()
+            self._list_stack.append("ul")
+        elif tag == "ol":
+            self._flush_buf()
+            self._list_stack.append("ol")
+        elif tag == "blockquote":
+            self._flush_buf()
+            self._quote_depth += 1
+        elif tag == "br":
+            self._buf.append("\n")
+        elif tag == "code" and self._code is None:
+            self._buf.append("`")
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "title":
             self._in_title = False
         if tag in self.SKIP and self._skip_depth > 0:
             self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if tag == "a" and self._href_stack:
+            start, href = self._href_stack.pop()
+            # 把 <a>…</a> 之间的缓冲片段包装为 [text](href)（留在缓冲里随行输出）
+            link_text = "".join(self._buf[start:]).strip() or href
+            del self._buf[start:]
+            self._buf.append(f"[{link_text}]({href})")
+        elif tag == "code" and self._code is None:
+            self._buf.append("`")
+        elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._flush_buf()
+            self._newline()
+        elif tag == "pre" and self._code is not None:
+            self._lines.append("```")
+            self._lines.extend(self._code)
+            self._lines.append("```")
+            self._code = None
+            self._newline()
+        elif tag in {"ul", "ol"} and self._list_stack:
+            self._flush_buf()
+            self._list_stack.pop()
+        elif tag == "blockquote" and self._quote_depth:
+            self._flush_buf()
+            self._quote_depth -= 1
+        elif tag in self.BLOCK_TAGS:
+            self._flush_buf()
+            if tag in {"p", "div", "section", "article", "blockquote"}:
+                self._newline()
 
     def handle_data(self, data: str) -> None:
         if self._in_title:
             self.title += data
-        elif self._skip_depth == 0 and data.strip():
-            self.chunks.append(data.strip())
+            return
+        if self._skip_depth:
+            return
+        if self._code is not None:
+            self._code.append(data.rstrip("\n"))
+            return
+        if data.strip():
+            self._buf.append(data if data.strip() else " ")
+
+    def result(self) -> tuple[str, str]:
+        self._flush_buf()
+        text = "\n".join(line for line in self._lines)
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        return text, self.title.strip()
 
 
 def _http_get(url: str, timeout: int = 30) -> str:
@@ -87,23 +191,26 @@ def fetch_html(url: str) -> str:
     return _http_get(url)
 
 
-def html_to_md(html: str) -> tuple[str, str]:
-    """从 HTML 提取 (正文文本, 标题)。"""
-    parser = _TextExtractor()
+def html_to_md(html: str, base_url: str = "") -> tuple[str, str]:
+    """从 HTML 提取 (结构化 Markdown, 标题)；base_url 用于链接绝对化。"""
+    parser = _MarkdownExtractor(base_url)
     parser.feed(html)
-    text = re.sub(r"\n{3,}", "\n\n", "\n".join(parser.chunks))
-    return text, parser.title.strip()
+    text, title = parser.result()
+    return text, title or ""
 
 
 def fetch_page_text(url: str) -> tuple[str, str]:
-    """返回 (正文文本, 标题)。"""
+    """返回 (结构化 Markdown, 标题)。"""
     url = validate_external_url(url)
     if SCRAPLING_AVAILABLE:  # pragma: no cover（视 env 而定）
         page = _ScraplingFetcher().get(url)
         title = page.css_first("title::text") or url
-        body = "\n".join(p.strip() for p in page.css("p::text") if p.strip())
-        return body or title, title
-    text, title = html_to_md(_http_get(url))
+        body = page.html_to_markdown() if hasattr(page, "html_to_markdown") else ""
+        if not body:
+            text, _ = html_to_md(page.html_content, url)
+            body = text
+        return body, title
+    text, title = html_to_md(_http_get(url), url)
     return text, title or url
 
 
