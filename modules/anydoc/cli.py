@@ -49,13 +49,15 @@ def run_anydoc(cfg: dict) -> dict:
 
     converted, failed = [], []
     for target in targets:
+        # anydoc 真实 CLI：anydoc <input> -o <out.md>（每文件一个 Markdown 输出）
+        out_md = output_dir / f"{target.stem}.md"
         completed = subprocess.run(
-            [str(binary), str(target), "--output", str(output_dir)],
+            [str(binary), str(target), "-o", str(out_md)],
             capture_output=True, text=True, timeout=300,
         )
-        if completed.returncode == 0:
-            converted.append(str(target))
-            info(f"转换成功: {target.name}")
+        if completed.returncode == 0 and out_md.exists():
+            converted.append(str(out_md))
+            info(f"转换成功: {target.name} → {out_md.name}")
         else:
             failed.append({"file": str(target), "stderr": completed.stderr[-300:]})
             error(f"转换失败: {target.name}")

@@ -32,8 +32,13 @@ def run_mineru(cfg: dict) -> dict:
     env = os.environ.copy()
     # 方案 3.3.1：ModelScope 本地模型源；MODELSCOPE_CACHE 指向自备目录
     env.setdefault("MINERU_MODEL_SOURCE", "modelscope")
+    # 线程上限（方案 3.3.1 纯 CPU 优化）：默认 4 核，防止占满全部核心
+    # 影响ONNX/OpenMP/BLAS 三层线程池；个别后端只认其中某个变量，全部设置兜底
+    threads = str(int(cfg.get("max_threads", 4)))
+    for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        env.setdefault(var, threads)
 
-    info(f"MinerU 解析开始: {input_path}")
+    info(f"MinerU 解析开始: {input_path}（线程上限 {threads}）")
     completed = subprocess.run(
         ["mineru", "-p", str(input_path), "-o", str(output_dir), "-b", "pipeline"],
         env=env, capture_output=True, text=True, timeout=TIMEOUT_SECONDS,

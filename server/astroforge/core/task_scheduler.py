@@ -224,6 +224,9 @@ class Scheduler:
                     "headless": self.settings.browser.headless,
                     "no_sandbox": self.settings.browser.no_sandbox,
                 })
+            if task_type == "mineru":
+                # 注入线程上限（settings.mineru.max_threads，防止占满全部 CPU）
+                step_config.setdefault("max_threads", self.settings.mineru.max_threads)
             if record.mode == "pipeline":
                 pipeline = self.engine.get(record.config.get("pipeline", ""))
                 if pipeline is not None:

@@ -38,6 +38,9 @@ node_modules/
 .deepsec/
 .mimosa/
 
+# ---- 第三方上游仓库（只本地参考/编译，不入我们的库）----
+third_party/
+
 # ---- IDE / OS ----
 .idea/
 .vscode/
