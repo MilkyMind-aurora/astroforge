@@ -81,16 +81,40 @@ macOS 数据目录规范：`~/Library/Application Support/AstroForge/`（模型�
 
 ## 当前状态（透明化）
 
-项目按两年里程碑推进，当前处于 **Phase 0-1（骨架与核心）**：
+项目按两年里程碑推进，当前处于 **Phase 7-8（集成测试与打包）**：
 
 | 里程碑 | 状态 |
 | --- | --- |
-| M0 环境验证 / 配置体系 / CI | 🚧 进行中 |
-| M1 服务核心 + TUI + 监控 | 🚧 进行中 |
-| M2-M8 模块集成 / 流水线 / AI 副驾驶 | ⏳ |
-| M10 Flutter 桌面端 | 🚧 骨架 |
-| M11 macOS 适配 + 双平台 CI | 🚧 CI 就绪 |
+| M0 环境验证 / 配置体系 / CI | ✅ 完成（CI 三平台持续绿） |
+| M1 服务核心 + TUI + 监控 | ✅ 完成（26 REST 路由 + 3 WS 通道 + 双写 PostgreSQL） |
+| M2 爬虫（Vue 官方文档整站结构化实测） | ✅ 完成（9 章节 52 页，断点续爬，Scrapling 渲染） |
+| M3 解析（MinerU 真机 ✅ / WPD 精度测试 ✅） | ✅ 完成 |
+| M4 转换（anydoc v0.2.4 编译 ✅ / md2docx 5 套模板 ✅） | ✅ 完成 |
+| M5 NovaFlow 流水线（模板持久化 + 运行） | ✅ 完成（步骤级断点续跑待做） |
+| M6 AI 副驾驶（独立进程/流式/对话入库/闲置卸载） | ✅ 完成（2B↔9B 切换 UI 待做） |
+| M7 集成测试与稳定性 | 🚧 冒烟矩阵 7/7 PASS；72h 长稳待跑 |
+| M8 Windows 打包 | 🚧 iss 就绪；Flutter 构建需系统开发者模式 |
+| M10 Flutter 桌面端（三页真实表单） | ✅ 完成 |
+| M11 macOS 适配 + 双平台 CI | 🚧 CI 就绪，实机矩阵待跑 |
 | M12 开源正式发布 v1.0 | ⏳ |
+
+## 验证工具
+
+```bash
+# 端到端冒烟矩阵（需服务核心运行中；--skip-ai 跳过引擎用例）
+python scripts\smoke_e2e.py
+
+# 内存峰值观测（另终端启动被测进程后传入 PID）
+python scripts\bench_memory.py --pid <PID> --label "MinerU 解析" --budget-gb 12
+
+# 重新生成 5 套 DOCX 模板
+python scripts\make_templates.py
+
+# 打包（Windows：先 flutter build windows --release，再 Inno Setup 编译）
+iscc app\packaging\windows\astroforge.iss
+# macOS
+bash app\packaging\macos\make_dmg.sh
+```
 
 完整方案见仓库文档（构建方案 13 章 + 9 个工程补丁）。
 
