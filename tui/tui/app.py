@@ -100,27 +100,96 @@ class ConnectScreen(ModalScreen):
 
 
 class AiPanel(ModalScreen):
-    """AI 抽屉占位（对接 AI 引擎属 Phase 6.3）。"""
+    """星伴 AI 抽屉（方案 3.7 / Phase 6.3）：WS 流式对话 + 指令任务卡片。"""
 
     CSS = """
     AiPanel { align: right middle; }
-    #ai-box { width: 48; height: 70%; padding: 1 2; border: tall #4FC3F7; background: $surface; }
+    #ai-box { width: 60; height: 80%; padding: 1 2; border: tall #4FC3F7; background: $surface; }
     #ai-out { height: 1fr; margin-bottom: 1; }
+    #ai-status { height: 1; color: $text-muted; }
     """
+
+    def __init__(self, client: ServiceClient) -> None:
+        super().__init__()
+        self.client = client
+        self._busy = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="ai-box"):
-            yield Static("✦ 星伴 AI（对话引擎属 Phase 6）", id="ai-title")
+            yield Static("✦ 星伴 AI（Sidereal 本地引擎）", id="ai-title")
             placeholder = Static(
-                "本地 GGUF 引擎未接入。\n自然语言指令驱动、流式回复与任务卡片将在此展示。"
+                "输入自然语言，星伴会解析为任务指令并自动执行。\n"
+                "示例：帮我爬取 https://example.com 转成 Markdown"
             )
             yield VerticalScroll(placeholder, id="ai-out")
-            yield Input(placeholder="输入指令（当前仅本地回显）", id="ai-in")
+            yield Static("", id="ai-status")
+            yield Input(placeholder="输入消息，回车发送", id="ai-in")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        out = self.query_one("#ai-out Static", Static)
-        out.update(out.renderable + f"\n\n[你] {event.value}\n[星伴] 已收到（引擎对接属 Phase 6）")
+        text = event.value.strip()
+        if not text or self._busy:
+            return
+        self._busy = True
         event.input.value = ""
+        self.run_worker(self._stream_chat(text), exclusive=False)
+
+    async def _stream_chat(self, message: str) -> None:
+        """WS /ws/ai 流式对话：ai_delta 增量渲染，ai_done 显示指令卡片。"""
+        out = self.query_one("#ai-out Static", Static)
+        status = self.query_one("#ai-status", Static)
+        status.update("连接流式通道…")
+        import websockets
+
+        base = self.client.base_url.replace("http", "ws")
+        try:
+            async with websockets.connect(
+                f"{base}/ws/ai?token={self.client.token}"
+            ) as ws:
+                await ws.send(json.dumps({"message": message}, ensure_ascii=False))
+                chunks: list[str] = []
+                frame_count = 0
+                while True:
+                    frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=180))
+                    ftype = frame.get("type")
+                    if ftype == "ai_delta":
+                        chunks.append(frame["payload"].get("text", ""))
+                        frame_count += 1
+                        status.update(f"生成中… {len(chunks)} 段")
+                        if frame_count % 12 == 0:  # 节流刷新，避免每帧重排
+                            out.update(f"[你] {message}\n\n[星伴] {''.join(chunks)}")
+                    elif ftype == "ai_done":
+                        payload = frame["payload"]
+                        self._render_done(out, message, payload)
+                        status.update("")
+                        return
+                    elif ftype == "ai_error":
+                        err = frame["payload"].get("message", "引擎错误")
+                        out.update(f"[你] {message}\n\n[red]{err}[/red]")
+                        status.update("")
+                        return
+        except Exception as exc:
+            status.update("")
+            out.update(f"[你] {message}\n\n[red]流式通道失败: {exc}[/red]")
+        finally:
+            self._busy = False
+
+    def _render_done(self, out: Static, message: str, payload: dict) -> None:
+        """ai_done：最终回复 + 指令任务卡片。"""
+        lines = [f"[你] {message}", "", f"[星伴] {payload.get('reply', '')}"]
+        instruction = payload.get("instruction")
+        if instruction:
+            task_type = instruction.get("task_type", "?")
+            params = instruction.get("params", {})
+            key_param = params.get("url") or params.get("input_path") or params.get("pipeline") or ""
+            lines += [
+                "",
+                f"[cyan]📋 已解析任务[/cyan] {task_type}  [dim]{str(key_param)[:40]}[/dim]",
+            ]
+            if payload.get("task_uuid"):
+                lines.append(f"[green]✅ 已创建任务 {payload['task_uuid'][:8]}[/green]（Ctrl+` 看日志）")
+            if payload.get("notice"):
+                lines.append(f"[yellow]{payload['notice']}[/yellow]")
+        out.update("\n".join(lines))
 
 
 class PlaceholderPage(Static):
@@ -315,7 +384,7 @@ class AstroForgeApp(App):
 
     # ---- 快捷键动作 ----
     def action_ai_panel(self) -> None:
-        self.push_screen(AiPanel())
+        self.push_screen(AiPanel(get_client()))
 
     def action_file_browser(self) -> None:
         self.push_screen(FileBrowserScreen(get_client()))
