@@ -55,10 +55,61 @@ class ApiClient {
     return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> listTasks({int page = 1}) async {
-    final data = _unwrap(await _dio.get('/api/v1/tasks', queryParameters: {'page': page}));
+  Future<List<dynamic>> listTasks({int page = 1, String? status}) async {
+    final data = _unwrap(await _dio.get('/api/v1/tasks', queryParameters: {
+      'page': page,
+      'status': ?status,
+    }));
     if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
     return const [];
+  }
+
+  /// 创建任务（独立调用模式）：taskType 如 spider_single / mineru / md2docx。
+  Future<Map<String, dynamic>> createTask(
+    String taskType,
+    Map<String, dynamic> config, {
+    String? title,
+  }) async {
+    final data = _unwrap(await _dio.post('/api/v1/tasks', data: {
+      'task_type': taskType,
+      'config': config,
+      'title': ?title,
+      'mode': 'standalone',
+    }));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  /// 取消任务。
+  Future<void> cancelTask(String taskUuid) async {
+    await _dio.post('/api/v1/tasks/$taskUuid/cancel');
+  }
+
+  /// 重试失败/取消的任务（新建同配置任务）。
+  Future<Map<String, dynamic>> retryTask(String taskUuid) async {
+    final data = _unwrap(await _dio.post('/api/v1/tasks/$taskUuid/retry'));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  // ---- NovaFlow 流水线（Phase 5）----
+  Future<List<dynamic>> listPipelines() async {
+    final data = _unwrap(await _dio.get('/api/v1/pipelines'));
+    if (data is Map && data['items'] is List) return data['items'] as List<dynamic>;
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> runPipeline(String name,
+      {Map<String, dynamic>? params, String? title}) async {
+    final data = _unwrap(await _dio.post('/api/v1/pipelines/$name/run', data: {
+      'params': params ?? <String, dynamic>{},
+      'title': ?title,
+    }));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> savePipeline(String yamlContent) async {
+    final data = _unwrap(
+        await _dio.post('/api/v1/pipelines', data: {'yaml_content': yamlContent}));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
   }
 
   /// 设置中心（Phase 1.3.3）：配置摘要 + 覆盖设置。

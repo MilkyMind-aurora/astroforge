@@ -22,6 +22,7 @@ from tui.pages.settings import SettingsPage
 from tui.pages.spider import SpiderPage
 from tui.service_client import ServiceClient, ServiceError, get_client
 from tui.ui.file_browser import FileBrowserScreen
+from tui.ui.mascot import get_frame, get_quote
 
 TAGLINE = "AstroForge — Forging Order from Stellar Chaos."
 VERSION = "Sidereal Core v0.1.0"
@@ -88,6 +89,7 @@ class ConnectScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id="connect-box"):
             yield Static("🔭 连不上 Sidereal Core（127.0.0.1:8420）", id="connect-title")
+            yield Static(get_frame("sleeping"), id="connect-mascot")
             yield Static("服务核心未启动。请在仓库根目录运行：\n\n"
                          "  Windows: scripts\\start_service.bat\n"
                          "  macOS:   bash scripts/start_service.sh\n\n"
@@ -230,6 +232,8 @@ class HomePage(VerticalScroll):
             return
         lines = [
             f"\n[bold cyan]首页[/bold cyan]  [dim]{TAGLINE}[/dim]",
+            f"[gold]{get_frame('idle')}[/gold]",
+            f"[i][星仔] {get_quote('boot')}[/i]",
             f"\n[bold]服务核心[/bold] v{health['version']} · 运行 {health['uptime_s']}s · "
             f"DB {'✅' if health['db'] else '❌'} · AI 引擎 {'✅' if health['ai_engine'] else '💤'}",
             f"[bold]环境体检[/bold] {summary['ok_count']}/{summary['total']} 通过：",
