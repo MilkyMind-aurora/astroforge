@@ -36,6 +36,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     } on ApiError catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    } catch (e) {
+      // DioException（401/网络层）等非业务异常同样转连接引导态
+      if (!mounted) return;
+      setState(() => _error = '服务不可达或 token 缺失（$e）');
     }
   }
 
