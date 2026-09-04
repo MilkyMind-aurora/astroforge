@@ -104,6 +104,7 @@ async def load_model(body: ModelBody):
     with _lock:
         _state["model"] = _load_model(body.model_key)
         _state["model_key"] = body.model_key
+        _state["last_used"] = time.time()  # 重置闲置计时，防止 load 后立即被看护卸载
     return {"ok": True, "current_model": body.model_key}
 
 
@@ -119,6 +120,7 @@ async def switch_model(body: ModelBody):
     with _lock:
         _state["model"] = _load_model(body.model_key)
         _state["model_key"] = body.model_key
+        _state["last_used"] = time.time()  # 重置闲置计时
     return {"ok": True, "current_model": body.model_key}
 
 
