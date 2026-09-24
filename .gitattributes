@@ -1,0 +1,7 @@
+# 设计契约生成物：跨平台字节一致（gen_design 幂等门禁 / CI diff=0 依赖 LF 统一）
+config/design/starfield/seed.json text eol=lf
+tui/tui/theme/generated/** text eol=lf
+app/lib/core/design/tokens.g.dart text eol=lf
+modules/_shared/star_console.py text eol=lf
+scripts/gen_design.py text eol=lf
+scripts/ui_doctor.py text eol=lf

@@ -38,6 +38,33 @@ jobs:
           name: openapi
           path: docs/openapi.json
 
+  design:
+    name: 设计契约（gen 幂等 + ui_doctor）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装服务核心依赖
+        run: pip install -e "server[dev]"
+      - name: 生成三端设计产物
+        run: python scripts/gen_design.py
+      - name: 设计契约门禁（tokens 变更必须随附再生成，diff=0）
+        run: |
+          status="$(git status --porcelain -- tui app modules config/design)"
+          if [ -n "$status" ]; then
+            echo "设计产物与提交不同步（改 tokens.yaml 后必须重跑 scripts/gen_design.py）："
+            echo "$status"
+            exit 1
+          fi
+      - name: 设计契约单测（点分键覆盖合并 + 生成物一致性）
+        run: python -m pytest tests/test_gen_design.py -q
+      # placeholder（占位页清零）与 bare-color（TUI 裸色）属 MF1「TUI 可看」的清账项，
+      # 壳层 token 化重写后摘除这两个 skip。
+      - name: ui_doctor 聚合验收
+        run: python scripts/ui_doctor.py --skip=placeholder,bare-color
+
   flutter:
     name: Flutter（analyze）
     runs-on: ubuntu-latest

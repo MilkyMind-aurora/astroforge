@@ -1,0 +1,7 @@
+# 主题包：dawn（内置 · 昼 · 晨昏）
+version: 1
+meta:
+  name: 晨昏
+  mode: light
+color:
+  bg: "#F6F7FC"           # 晨昏白（示例覆盖位；实际取值以根 tokens 为准，此文件演示覆盖机制）

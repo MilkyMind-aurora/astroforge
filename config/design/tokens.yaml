@@ -1,0 +1,174 @@
+# ============================================================
+# AstroForge 星空设计系统 tokens.yaml（唯一事实源）
+# 依据：《前端优化方案V1-星空版》§1 基线 + 《星空设计系统规格 v1》校验层
+#   （design/星空设计系统规格v1.md，9 处修正已并入，全部带 WCAG 证据）
+# 消费：scripts/gen_design.py → tui tokens.tcss/tokens.py · app tokens.g.dart ·
+#       modules/_shared/star_console.py 样式
+# 纪律：三端禁止出现本文件之外的任何硬编码色值（CI grep 断言）；
+#       主题包 themes/<name>/tokens.yaml 用点分键覆盖（同 platform_overrides 语义）
+# ============================================================
+version: 1
+meta:
+  name: astroforge-starry
+  contrast_standard: WCAG 2.1 AA  # 正文 4.5:1 / 大字与图形 3:1，证据见规格 v1
+  radius_policy: "四档 999/20/16/12，禁自造"
+
+# ===== 色板（昼/夜 双值；夜=深空主战场）=====
+color:
+  # ---- 表面阶梯（唯一合法表面，禁自造中间值）----
+  bg:                { light: "#F6F7FC", dark: "#05070F" }   # S0 页面底/星野画布/侧栏轨
+  sunken:            { light: "#E8EBF4", dark: "#0A0D18" }   # S-1 输入井（仅嵌 card 内）
+  card:              { light: "#FFFFFF", dark: "#10131F" }   # S1 一切内容载体
+  container:         { light: "#EDEFF7", dark: "#171B2C" }   # S2 填充（chips/组卡）
+  cardRaised:        { light: "#FFFFFF", dark: "#171B2C" }   # S2 浮层（弹层/菜单/tooltip）
+  containerPressed:  { light: "#E2E5F0", dark: "#1F2438" }   # S3 按压回执（禁静态表面）
+  faint:             { light: "#E0E4F0", dark: "#222741" }   # 仅表格行分隔 1dp@70%（装饰）
+
+  # ---- 文字阶梯 ----
+  ink-900:           { light: "#131629", dark: "#EDF0FB" }   # 主文字（星白/墨）
+  ink-600:           { light: "#565B76", dark: "#9AA1C0" }   # 次级
+  ink-400:           { light: "#606681", dark: "#858CB1" }   # 占位/提示（v1 修正值）
+
+  # ---- 描边 ----
+  stroke:            { light: "#C9CEE4", dark: "#2A2F4D" }   # 装饰描边（不承担状态）
+  strokeFocus:       { light: "#3A4066", dark: "#3A4066" }   # 已降级装饰；焦点语义走 focusRing
+
+  # ---- 强调色（荧光点睛 ≤6%；aurora=全局唯一主强调）----
+  aurora:            { light: "#0C9B7E", dark: "#4EE0C0" }   # 选中/主按钮/进度/运行中/今日点
+  auroraText:        { light: "#087560", dark: "#4EE0C0" }   # 昼档正文用变体（夜=原值）
+  nebula:            { light: "#6C5CE7", dark: "#8B7CF6" }   # AI 专属位（星伴/思考/流式）
+  nebulaText:        { light: "#5B4ED1", dark: "#8B7CF6" }
+  hydrogen:          { light: "#1668B3", dark: "#4FC3F7" }   # 信息位（链接/图表副系列）
+  molten:            { light: "#A66F14", dark: "#FFB74D" }   # 仪式/弱警示
+  moltenText:        { light: "#8F5F0F", dark: "#FFB74D" }
+  nova:              { light: "#C3272B", dark: "#FF5648" }   # 错误/删除/红色告警
+
+  # ---- 实底上的文字（硬裁定：aurora 底一律深字，禁白字）----
+  onAurora:          { light: "#131629", dark: "#05070F" }   # 夜 12.21:1 / 昼 5.11:1
+  onNebula:          { light: "#131629", dark: "#05070F" }
+  onHydrogen:        { light: "#F6F7FC", dark: "#05070F" }
+  onMolten:          { light: "#131629", dark: "#05070F" }
+  onNova:            { light: "#F6F7FC", dark: "#05070F" }   # 夜 6.40:1
+
+  # ---- alpha 合成色（预计算，避免各端合成漂移）----
+  chipsSelectedBg:   { light: "#E2F3F0", dark: "#172C32" }   # aurora@12% on card
+  aiContainerBg:     { light: "#EAE8FC", dark: "#21223D" }   # nebula@14% on card（AI 抽屉头/模型胶囊）
+  errorWashBg:       { light: "#F9E9EA", dark: "#281A23" }   # nova@10% on card（失败行 wash）
+  runningWashBg:     { light: "#E2F3F0", dark: "#141F29" }   # aurora@6% on card（运行中前推）
+  alertWashBg:       { light: "#E2F3F0", dark: "#15232C" }   # aurora@8% on card（告警区 wash）
+
+  # ---- 银河渐变（白名单位 3 处，同屏 ≤1，面积 ≤6%）----
+  galaxy:
+    stops: ["#4EE0C0", "#8B7CF6", "#4FC3F7"]                  # 夜（昼档 ["#0C9B7E","#6C5CE7","#1668B3"]）
+    stopsLight: ["#0C9B7E", "#6C5CE7", "#1668B3"]
+    positions: [0.0, 0.52, 1.0]
+    whitelist:
+      - flutter_task_banner   # 90° 水平 h56 R20 + 高光扫过 900ms 一次
+      - ai_drawer_headline    # 180° 垂直 3×40dp 饰线
+      - tui_boot_banner       # 行级近似（fg 按行 aurora/nebula/hydrogen）
+
+  # ---- 星野 ----
+  starfield:
+    alpha_steps: [0.04, 0.08, 0.12]      # 上限 0.12；昼档 alpha 减半
+    size_steps: [1.0, 1.5, 2.0]          # dp，与 alpha 档一一对应
+    density: [60, 90]                    # 颗/壳层视口；坐标由 starfield/seed.json 预生成
+    drift_dp: 2.0
+    drift_period_s: 4.0
+    meteor_interval_s: 120
+    meteor_duration_ms: 250
+    degrade_rule: "帧率 <45 持续 5s → uDensity=0；golden test 冻结 uTime=0"
+
+# ===== 圆角（四档，禁自造）=====
+radius:
+  pill: 999      # 钮/chips/输入条/导航胶囊/进度条（胶囊族）
+  lg: 20         # 大卡/hero/模态
+  md: 16         # 标准卡/弹层/菜单/KPI
+  sm: 12         # 嵌入式小表面（表单井/sparkline 容器/tooltip）
+
+# ===== 间距（基数 4）=====
+space:
+  window: 20     # 窗边距
+  card: 16       # 卡内边距
+  gap: 8         # 组件间（档 2：8/12）
+  gap-lg: 12
+  section: 24    # 节间（档 2：24/32）
+  section-lg: 32
+  empty: 96      # 空态留白下限
+
+# ===== 字阶（正文系统 CJK；数字 mono+tabular）=====
+type:
+  display:    { size: 32, height: 40, weight: 600 }   # 启动屏/空态问候（每屏 ≤1）
+  h1:         { size: 24, height: 32, weight: 600 }
+  h2:         { size: 20, height: 28, weight: 500 }
+  title:      { size: 17, height: 24, weight: 500 }
+  title-sm:   { size: 15, height: 22, weight: 500 }
+  body:       { size: 14, height: 22, weight: 400 }
+  body-sm:    { size: 13, height: 20, weight: 400 }
+  caption:    { size: 12, height: 18, weight: 400 }
+  label:      { size: 11, height: 16, weight: 500 }
+  kpi:        { size: 28, height: 34, weight: 500, mono: true, tabular: true }  # 仪表感
+  mono_family: "JetBrainsMono"   # 仅打包 latin 子集；中文跟随系统
+
+# ===== 动效曲线（全局唯六，禁自造）=====
+motion:
+  flutter:
+    spring_press: { stiffness: 400, damping: 0.62 }   # 按压回弹/小位移
+    spring_soft:  { stiffness: 260, damping: 0.85 }   # 列表重排/邻项让位
+    spring_pop:   { stiffness: 320, damping: 0.72 }   # 浮起/生长式弹出
+    tween_color:  { duration_ms: 150, easing: fastOutSlowIn }
+    tween_move:   { duration_ms: 250, easing: fastOutSlowIn }
+    tween_theme:  { duration_ms: 250 }                # 全色板 lerp
+  tui:
+    t_press: { duration_ms: 120, easing: in_out_cubic }
+    t_slide: { duration_ms: 250, easing: out_cubic }
+    t_fade:  { duration_ms: 200, easing: in_out_sine }
+    t_stream_batch: "2~4 token/帧合批（增量 append，禁整块重排）"
+  cli:
+    progress_throttle_ms: 100
+    spinner_frame_ms: 80
+  duration_caps:
+    feedback_max_ms: 300      # 交互反馈红线
+    transition_ms: [250, 400]
+    stagger_per_item_ms: 30
+    active_glow_max: 1        # 全屏活光 ≤1（AI 输入条聚焦光晕）
+  reduced_motion:
+    flutter: "MediaQuery.disableAnimations"
+    tui_cli: "appearance.animation: full|minimal"
+
+# ===== 交互参数（三端唯一取值处）=====
+interaction:
+  hit_min_dp: 40              # 视觉可 36
+  gesture:
+    sheet_dismiss: { distance_dp: 96, velocity_dps: 1000, rule: "位移或速度满足其一" }
+    drawer_open:   { distance_ratio: 0.4, velocity_dps: 800 }
+    long_press_ms: 400
+    slop_dp: 8
+    swipe_confirm_ratio: 0.8  # 滑动确认删除（敏感操作替代二次弹窗）
+  keyboard:
+    nav_debounce_ms: 30
+    palette_debounce_ms: 150
+  states: [default, hover, pressed, selected, disabled, loading, success, error, empty, readonly]
+
+# ===== 延迟分档（本地服务 <10ms；禁表演性加载）=====
+latency:
+  instant:  { max_ms: 100, rule: "禁骨架屏/shimmer/全屏 loading；立即渲染+SWR；按钮反馈 ≤150ms" }
+  short:    { max_ms: 5000, rule: "按钮 busy 变形；AI 思忖三点；禁整页阻断；>2s 给进行文案" }
+  long:     { min_ms: 10000, rule: "可离开（全局 WS 进度）+ 预计剩余时长 + 完成多通道触达 + 日志随时可看" }
+
+# ===== 星仔（详见 design/星仔生命感与彩蛋系统规格v1.md）=====
+mascot:
+  state_machine: star_forge
+  quote_budget_per_hour: 4
+  alert_mute: true           # 告警期全局静默（禁卖萌）
+  single_active_slot: true   # 同屏最多 1 动效位
+
+# ===== TUI（OpenCode 视觉纪律，见方案 V1.2-1）=====
+tui:
+  visual_baseline: opencode          # 结构对标 opencode TUI（实测 sst/opencode dev 分支）
+  box_language: bordered             # TUI 用盒式语言（对话组/弹窗/命令面板带边框盒）；无边框明度流是 Flutter 的事
+  border_levels:                     # 对齐 opencode borderSubtle/border/borderActive 三档
+    subtle: faint                    # 静态分组
+    normal: stroke                   # 普通盒
+    active: aurora                   # 聚焦盒（对齐 opencode borderActive 提亮逻辑）
+  thinking_opacity: 0.6              # AI 思考块透明度（opencode 同款参数）
+  system_theme: ansi-derived         # 补 system 主题：从终端 ANSI 调色板推导 + 保留终端透明度（opencode 同机制）

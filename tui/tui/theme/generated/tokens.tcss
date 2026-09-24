@@ -1,0 +1,37 @@
+/* ============================================================
+ * AstroForge TUI token 样式（生成物 —— scripts/gen_design.py，禁手改）
+ * 源：config/design/tokens.yaml（sha256:8b1d8e5646fd）
+ * 默认主题：deep-space（夜）；类名 = 前缀 + token 名（.c-ink-900/.bg-card）。
+ * 主题热切走 tokens.py css_variables() + refresh_css（§1.5），本文件是默认档。
+ * ============================================================ */
+
+/* 文字（ink 阶梯 + 强调色文本位；夜档强调色文本图形双用） */
+.c-ink-900 { color: #EDF0FB; }
+.c-ink-600 { color: #9AA1C0; }
+.c-ink-400 { color: #858CB1; }
+.c-aurora { color: #4EE0C0; }
+.c-auroraText { color: #4EE0C0; }
+.c-nebula { color: #8B7CF6; }
+.c-nebulaText { color: #8B7CF6; }
+.c-hydrogen { color: #4FC3F7; }
+.c-molten { color: #FFB74D; }
+.c-moltenText { color: #FFB74D; }
+.c-nova { color: #FF5648; }
+
+/* 表面阶梯（唯一合法表面，禁自造中间值） */
+.bg-bg { background: #05070F; }
+.bg-sunken { background: #0A0D18; }
+.bg-card { background: #10131F; }
+.bg-container { background: #171B2C; }
+.bg-cardRaised { background: #171B2C; }
+.bg-containerPressed { background: #1F2438; }
+.bg-chipsSelectedBg { background: #172C32; }
+.bg-aiContainerBg { background: #21223D; }
+.bg-errorWashBg { background: #281A23; }
+.bg-runningWashBg { background: #141F29; }
+.bg-alertWashBg { background: #15232C; }
+
+/* 盒式语言边框三档（V1.2-1 对齐 opencode subtle/normal/active） */
+.border-subtle { border: round #222741; }
+.border-normal { border: round #2A2F4D; }
+.border-active { border: round #4EE0C0; }

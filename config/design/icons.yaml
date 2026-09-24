@@ -1,0 +1,48 @@
+# ============================================================
+# AstroForge 星符表（icons.yaml）——语义名唯一映射，禁散落硬编码字符
+# 消费：TUI（直接字形）· Flutter（lucide_icons 映射，线性 20dp stroke1.8）
+# 纪律：代码中一律引用语义名（icons.nav.home），grep 验收零裸星符
+# ============================================================
+version: 1
+
+nav:
+  home: "✦"        # lucide: home
+  spider: "☄"      # lucide: globe
+  parser: "◈"      # lucide: file-search
+  converter: "❖"   # lucide: file-symlink
+  pipeline: "✺"    # lucide: workflow
+  monitor: "◉"     # lucide: activity
+  history: "☾"     # lucide: history
+  settings: "✜"    # lucide: settings
+  task: "✧"        # lucide: layout-list（IA 5 页制的「任务」页）
+
+ai:
+  idle: "✵"        # lucide: sparkles
+  thinking: "✶"    # 帧动画 ✶→✷→✸（1.2s 循环）
+  thinking_f2: "✷"
+  thinking_f3: "✸"
+  done: "☄"
+  send: "✵"
+  fallback: "✧"
+
+status:
+  ok: "●"
+  idle: "◌"
+  error: "✕"
+  warn: "▲"
+  hint: "✧"
+
+task:
+  running: "◈"     # 帧动画 ◈→◉
+  running_f2: "◉"
+  pending: "○"
+  success: "✓"
+  failed: "✕"
+  canceled: "⊘"
+
+misc:
+  meteor: "☄"
+  star_rank_1: "✦"
+  star_rank_2: "✦✦"
+  star_rank_3: "✧"
+  binary_star: "✦✧"

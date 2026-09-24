@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/design/tokens.g.dart';
 import 'core/router.dart';
-import 'core/theme.dart';
 
 /// AstroForge Flutter 桌面端入口（Windows/macOS）。
 Future<void> main() async {
@@ -29,8 +29,9 @@ class AstroForgeApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'AstroForge · 衍星台',
-      theme: AstroForgeTheme.light(),
-      darkTheme: AstroForgeTheme.dark(),
+      // 星空设计契约（tokens.g.dart 生成物；手写 ColorScheme，禁 fromSeed）
+      theme: AstroTheme.light(),
+      darkTheme: AstroTheme.dark(),
       themeMode: ThemeMode.system,
       routerConfig: router,
     );

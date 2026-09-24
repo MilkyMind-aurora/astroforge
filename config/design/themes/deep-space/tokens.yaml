@@ -1,0 +1,7 @@
+# 主题包：deep-space（内置 · 夜 · 默认）
+# 覆盖语义：点分键覆盖 config/design/tokens.yaml 同名键，未覆盖键回落全局
+version: 1
+meta:
+  name: 深空
+  mode: dark
+color: {}          # 空覆盖：deep-space 即全局默认夜值
