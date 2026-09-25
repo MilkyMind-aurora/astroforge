@@ -255,10 +255,14 @@ async def test_壳层冒烟_8页换装与抽屉唤起() -> None:
     import time as _time
 
     from tui.app import AstroForgeApp
-    from tui.panels.ai_drawer import AiDrawerScreen
+    from tui.panels.ai_drawer import AiDrawerScreen, ModelSheet
     from tui.panels.log_panel import LogPanelScreen
+    from tui.plugins.history.page import HistoryDetailScreen
     from tui.plugins.home.page import HomePage
+    from tui.service_client import get_client
     from tui.shell.boot import BootScreen
+    from tui.shell.connect import ConnectScreen
+    from tui.ui.file_browser import FileBrowserScreen
 
     def _page_mounted(app, key: str) -> bool:
         children = app.query_one("#content").children
@@ -290,7 +294,31 @@ async def test_壳层冒烟_8页换装与抽屉唤起() -> None:
         app.action_ai_panel()
         await pilot.pause()
         assert isinstance(app.screen, AiDrawerScreen)
+        # 点模型胶囊 → 推送 ModelSheet（回归：CSS 曾引用未定义变量 $scrim，
+        # 推送即 UnresolvedVariableError 且 App 致命退出，评审 2026-09）
+        await pilot.click("#ai-model-btn")
+        await pilot.pause()
+        assert isinstance(app.screen, ModelSheet)   # 样式表解析通过=能正常弹出
+        app.pop_screen()
+        await pilot.pause()
+        assert isinstance(app.screen, AiDrawerScreen)
         app.pop_screen()
         app.action_toggle_log()
         await pilot.pause()
         assert isinstance(app.screen, LogPanelScreen)
+        app.pop_screen()
+        # 其余屏级 CSS 全量编译（同类 $scrim 问题在此一并拦截）
+        app.push_screen(ConnectScreen())
+        await pilot.pause()
+        assert isinstance(app.screen, ConnectScreen)
+        app.pop_screen()
+        app.push_screen(FileBrowserScreen(get_client()))
+        await pilot.pause()
+        assert isinstance(app.screen, FileBrowserScreen)
+        app.pop_screen()
+        app.push_screen(HistoryDetailScreen(
+            get_client(), {"task_uuid": "uuid-abcd1234", "task_type": "spider_site",
+                           "status": "failed", "progress": 50, "steps": []}))
+        await pilot.pause()
+        assert isinstance(app.screen, HistoryDetailScreen)
+        app.pop_screen()

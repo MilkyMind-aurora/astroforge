@@ -69,7 +69,7 @@ class ModelSheet(Screen):
     """模型选择弹层（§5.6 与 Kimi 模型弹层同构的 TUI 落地：盒式 OptionList）。"""
 
     CSS = """
-    ModelSheet { align: center middle; background: $scrim; }
+    ModelSheet { align: center middle; background: $bg 70%; }
     #model-box { width: 52; height: auto; border: round $border-active;
         background: $cardRaised; padding: 0 1; }
     #model-title { color: $ink-900; padding-bottom: 1; }

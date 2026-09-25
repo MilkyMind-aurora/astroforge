@@ -87,12 +87,12 @@ class HistoryDetailScreen(Screen):
     def __init__(self, client: ServiceClient, task: dict) -> None:
         super().__init__()
         self.client = client
-        self.task = dict(task)
+        self.task_data = dict(task)
         self._undo_left = 0
         self._undo_task: str | None = None
 
     def compose(self) -> ComposeResult:
-        task = self.task
+        task = self.task_data
         glyph, color = STATUS_META.get(str(task.get("status")),
                                        ("task.pending", "ink-400"))
         with Vertical(id="hd-box"):
@@ -131,7 +131,7 @@ class HistoryDetailScreen(Screen):
     async def _load_tail_logs(self) -> None:
         log_widget = self.query_one("#hd-logs", RichLog)
         try:
-            data = await self.client.task_logs(str(self.task.get("task_uuid")), offset=0)
+            data = await self.client.task_logs(str(self.task_data.get("task_uuid")), offset=0)
         except Exception as exc:
             log_widget.write(Text(
                 f"日志尾行拉取失败：{exc}",
@@ -154,13 +154,13 @@ class HistoryDetailScreen(Screen):
             detail = await self.client.task_detail(event.task_uuid)
         except Exception:
             return
-        self.task = detail
+        self.task_data = detail
         await self.query_one(StepTimeline).set_steps(list(detail.get("steps", [])))
 
     # ---- 操作行 ----
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id or ""
-        task_uuid = str(self.task.get("task_uuid"))
+        task_uuid = str(self.task_data.get("task_uuid"))
         if button_id == "hd-retry":
             await self._retry_with_undo(task_uuid)
         elif button_id == "hd-cancel":
