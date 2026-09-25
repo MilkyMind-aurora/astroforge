@@ -358,6 +358,33 @@ def _py(value: Any) -> str:
     return repr(value)
 
 
+LINE_LIMIT = 96  # 单行字面量软上限（产物须过 ruff 110 列，留缩进余量）
+
+
+def _py_lines(value: Any, indent: int) -> list[str]:
+    """嵌套字面量分行渲染：能单行放下（≤LINE_LIMIT 列）保持单行，否则递归展开。"""
+    pad = " " * indent
+    single = _py(value)
+    if len(single) + indent <= LINE_LIMIT or not isinstance(value, (dict, list, tuple)):
+        return [single]
+    open_ch, close_ch = ("{", "}") if isinstance(value, dict) else ("[", "]")
+    rows = [open_ch]
+    items = value.items() if isinstance(value, dict) else value
+    for key, item in (
+        items if isinstance(value, dict) else [(None, item) for item in items]
+    ):
+        inner = _py_lines(item, indent + 4)
+        prefix = f"{pad}{_py(key)}: " if key is not None else f"{pad}"
+        if len(inner) == 1:
+            rows.append(f"{prefix}{inner[0]},")
+        else:
+            rows.append(f"{prefix}{inner[0]}")
+            rows.extend(inner[1:])
+            rows[-1] += ","
+    rows.append(pad[:-4] + close_ch)
+    return rows
+
+
 def render_tui_tcss(palette: dict[str, str], border_levels: dict[str, str], sha: str) -> str:
     """Textual 工具类样式：默认主题（deep-space 夜）字面色 + 语义类名。"""
     lines = [
@@ -407,6 +434,19 @@ def render_tui_py(
     def dict_lit(mapping: dict[str, Any], indent: int = 0) -> list[str]:
         pad = " " * indent
         return [f"{pad}{_py(k)}: {_py(v)}," for k, v in mapping.items()]
+
+    def dict_lit_pretty(mapping: dict[str, Any], indent: int = 0) -> list[str]:
+        """嵌套 dict 分行渲染（超 LINE_LIMIT 的嵌套节用，保产物过 ruff 110 列）。"""
+        out: list[str] = []
+        for key, value in mapping.items():
+            inner = _py_lines(value, indent + 4)
+            if len(inner) == 1:
+                out.append(f"{' ' * indent}{_py(key)}: {inner[0]},")
+            else:
+                out.append(f"{' ' * indent}{_py(key)}: {inner[0]}")
+                out.extend(inner[1:])
+                out[-1] += ","
+        return out
 
     def block(mapping: dict[str, Any], indent: int = 0) -> list[str]:
         return [f"{' ' * indent}{row}" for row in dict_lit(mapping, indent + 4)]
@@ -473,9 +513,10 @@ def render_tui_py(
         ("TYPE", type_sec),
         ("STARFIELD", tokens["color"]["starfield"]),
         ("MOTION_TUI", tokens["motion"]["tui"]),
+        ("INTERACTION", tokens["interaction"]),  # 键盘去抖/手势阈值（§1.7 三端唯一取值处）
     ):
         lines += [f"{const_name}: dict[str, Any] = {{"]
-        lines += block(section)
+        lines += [f"    {row}" for row in dict_lit_pretty(section, 4)]
         lines += ["}", ""]
     lines += [
         f"MONO_FAMILY = {_py(mono_family)}",

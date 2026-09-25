@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""终端内文件浏览器（方案 1.5，数据源 /files/browse 白名单目录）。"""
+"""终端内文件浏览器（方案 1.5，数据源 /files/browse 白名单目录）。
+
+pick 模式（解析/转换中心 F 键联动）：选中文件即 dismiss(路径) 回填表单；
+浏览模式（默认）：文件回车预览、目录进入。
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,22 +22,27 @@ class FileBrowserScreen(ModalScreen):
 
     CSS = """
     FileBrowserScreen { align: center middle; }
-    #fb-box { width: 90%; height: 80%; border: round #8B7CF6; padding: 1 2; background: $surface; }
-    #fb-list { height: 2fr; border: solid $primary-muted; margin-bottom: 1; }
-    #fb-preview { height: 1fr; border: solid $primary-muted; padding: 0 1; overflow: auto; }
-    #fb-path { margin-bottom: 1; }
+    #fb-box { width: 90%; height: 80%; border: round $border-normal;
+        padding: 1 2; background: $card; }
+    #fb-list { height: 2fr; border: round $border-subtle; margin-bottom: 1; }
+    #fb-preview { height: 1fr; border: round $border-subtle; padding: 0 1;
+        overflow: auto; color: $ink-600; }
+    #fb-path { margin-bottom: 1; color: $ink-900; }
     """
 
-    def __init__(self, client: ServiceClient) -> None:
+    def __init__(self, client: ServiceClient, pick: bool = False) -> None:
         super().__init__()
         self.client = client
+        self.pick = pick  # True：选中文件即回传路径（表单联动）
         self._entries: list[tuple[str, str | None, bool]] = []  # (label, path, is_dir)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="fb-box"):
             yield Static("📂 /", id="fb-path")
             yield OptionList(id="fb-list")
-            yield Static("（↑↓ 选择，回车进入目录/预览文件）", id="fb-preview")
+            hint = ("↑↓ 选择，回车选定文件" if self.pick
+                    else "（↑↓ 选择，回车进入目录/预览文件）")
+            yield Static(hint, id="fb-preview")
             yield Button("关闭 (Esc)", id="fb-close", variant="default")
 
     def on_mount(self) -> None:
@@ -79,6 +88,10 @@ class FileBrowserScreen(ModalScreen):
         if not option_id:
             return
         is_dir = any(p == option_id and d for p, d in self._entries)
+        if self.pick and not is_dir:
+            # pick 模式：文件选定即回传（路径回填表单）
+            self.dismiss(option_id)
+            return
         if is_dir:
             self.run_worker(self.load(option_id), exclusive=True)
         else:

@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Button, Input, Static
 from tui.service_client import ServiceClient
+from tui.theme.generated import tokens as design
 
 EDITABLE = {
     "memory_warning_gb": "内存黄色预警 (GB)",
@@ -23,7 +24,8 @@ class SettingsPage(VerticalScroll):
         self.client = client
 
     def compose(self) -> ComposeResult:
-        yield Static("设置  正在加载…", id="settings-body")
+        yield Static(
+            f"[b]{design.icon('nav.settings')} 设置[/b]  正在加载…", id="settings-body")
 
     def on_mount(self) -> None:
         self.run_worker(self.refresh_settings(), exclusive=True)
@@ -35,7 +37,7 @@ class SettingsPage(VerticalScroll):
             summary = (await self.client.config_summary()) or {}
             overrides = ((await self.client.list_app_settings()) or {}).get("items", {})
         except Exception as exc:
-            await self.mount(Static(f"[red]加载失败[/red] {exc}", id="settings-body"))
+            await self.mount(Static(f"[${'nova'}]加载失败[/] {exc}", id="settings-body"))
             return
 
         box = Vertical(id="settings-box")

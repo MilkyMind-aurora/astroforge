@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # ============================================================
 # AstroForge TUI 设计常量（生成物 —— scripts/gen_design.py，禁手改）
-# 源：config/design/tokens.yaml + icons.yaml（sha256:8b1d8e5646fd）
+# 源：config/design/tokens.yaml + icons.yaml（sha256:80f421055903）
 # 消费：壳层/页面一律引用语义名（design.DARK["aurora"]、design.icons.nav.home、
 #       design.icon("nav.home")），禁散落硬编码色值与星符（§3.7 门禁 grep 断言）。
 # ============================================================
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 TOKENS_VERSION = 1
-SOURCE_SHA256 = "8b1d8e5646fd"
+SOURCE_SHA256 = "80f421055903"
 DEFAULT_THEME = "deep-space"
 THEMES: tuple[str, ...] = ("dawn", "deep-space",)
 THEME_MODE: dict[str, str] = {
@@ -168,51 +168,75 @@ GALAXY: dict[str, Any] = {
 }
 
 RADIUS: dict[str, Any] = {
-    "pill": 999,
-    "lg": 20,
-    "md": 16,
-    "sm": 12,
+        "pill": 999,
+        "lg": 20,
+        "md": 16,
+        "sm": 12,
 }
 
 SPACE: dict[str, Any] = {
-    "window": 20,
-    "card": 16,
-    "gap": 8,
-    "gap-lg": 12,
-    "section": 24,
-    "section-lg": 32,
-    "empty": 96,
+        "window": 20,
+        "card": 16,
+        "gap": 8,
+        "gap-lg": 12,
+        "section": 24,
+        "section-lg": 32,
+        "empty": 96,
 }
 
 TYPE: dict[str, Any] = {
-    "display": {"size": 32, "height": 40, "weight": 600},
-    "h1": {"size": 24, "height": 32, "weight": 600},
-    "h2": {"size": 20, "height": 28, "weight": 500},
-    "title": {"size": 17, "height": 24, "weight": 500},
-    "title-sm": {"size": 15, "height": 22, "weight": 500},
-    "body": {"size": 14, "height": 22, "weight": 400},
-    "body-sm": {"size": 13, "height": 20, "weight": 400},
-    "caption": {"size": 12, "height": 18, "weight": 400},
-    "label": {"size": 11, "height": 16, "weight": 500},
-    "kpi": {"size": 28, "height": 34, "weight": 500, "mono": True, "tabular": True},
+        "display": {"size": 32, "height": 40, "weight": 600},
+        "h1": {"size": 24, "height": 32, "weight": 600},
+        "h2": {"size": 20, "height": 28, "weight": 500},
+        "title": {"size": 17, "height": 24, "weight": 500},
+        "title-sm": {"size": 15, "height": 22, "weight": 500},
+        "body": {"size": 14, "height": 22, "weight": 400},
+        "body-sm": {"size": 13, "height": 20, "weight": 400},
+        "caption": {"size": 12, "height": 18, "weight": 400},
+        "label": {"size": 11, "height": 16, "weight": 500},
+        "kpi": {"size": 28, "height": 34, "weight": 500, "mono": True, "tabular": True},
 }
 
 STARFIELD: dict[str, Any] = {
-    "alpha_steps": [0.04, 0.08, 0.12],
-    "size_steps": [1.0, 1.5, 2.0],
-    "density": [60, 90],
-    "drift_dp": 2.0,
-    "drift_period_s": 4.0,
-    "meteor_interval_s": 120,
-    "meteor_duration_ms": 250,
-    "degrade_rule": "帧率 <45 持续 5s → uDensity=0；golden test 冻结 uTime=0",
+        "alpha_steps": [0.04, 0.08, 0.12],
+        "size_steps": [1.0, 1.5, 2.0],
+        "density": [60, 90],
+        "drift_dp": 2.0,
+        "drift_period_s": 4.0,
+        "meteor_interval_s": 120,
+        "meteor_duration_ms": 250,
+        "degrade_rule": "帧率 <45 持续 5s → uDensity=0；golden test 冻结 uTime=0",
 }
 
 MOTION_TUI: dict[str, Any] = {
-    "t_press": {"duration_ms": 120, "easing": "in_out_cubic"},
-    "t_slide": {"duration_ms": 250, "easing": "out_cubic"},
-    "t_fade": {"duration_ms": 200, "easing": "in_out_sine"},
-    "t_stream_batch": "2~4 token/帧合批（增量 append，禁整块重排）",
+        "t_press": {"duration_ms": 120, "easing": "in_out_cubic"},
+        "t_slide": {"duration_ms": 250, "easing": "out_cubic"},
+        "t_fade": {"duration_ms": 200, "easing": "in_out_sine"},
+        "t_stream_batch": "2~4 token/帧合批（增量 append，禁整块重排）",
+}
+
+INTERACTION: dict[str, Any] = {
+        "hit_min_dp": 40,
+        "gesture": {
+            "sheet_dismiss": {"distance_dp": 96, "velocity_dps": 1000, "rule": "位移或速度满足其一"},
+            "drawer_open": {"distance_ratio": 0.4, "velocity_dps": 800},
+            "long_press_ms": 400,
+            "slop_dp": 8,
+            "swipe_confirm_ratio": 0.8,
+        },
+        "keyboard": {"nav_debounce_ms": 30, "palette_debounce_ms": 150},
+        "states": [
+            "default",
+            "hover",
+            "pressed",
+            "selected",
+            "disabled",
+            "loading",
+            "success",
+            "error",
+            "empty",
+            "readonly",
+        ],
 }
 
 MONO_FAMILY = "JetBrainsMono"
@@ -259,6 +283,12 @@ ICONS: dict[str, str] = {
     "misc.star_rank_2": "✦✦",
     "misc.star_rank_3": "✧",
     "misc.binary_star": "✦✧",
+    "misc.spinner_f1": "◐",
+    "misc.spinner_f2": "◓",
+    "misc.spinner_f3": "◑",
+    "misc.spinner_f4": "◒",
+    "misc.star_dim": "·",
+    "misc.star_mid": "•",
 }
 
 def icon(path: str) -> str:  # 例：icon("ai.thinking_f2")

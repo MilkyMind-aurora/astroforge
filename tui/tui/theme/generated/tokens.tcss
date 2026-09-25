@@ -1,6 +1,6 @@
 /* ============================================================
  * AstroForge TUI token 样式（生成物 —— scripts/gen_design.py，禁手改）
- * 源：config/design/tokens.yaml（sha256:8b1d8e5646fd）
+ * 源：config/design/tokens.yaml（sha256:80f421055903）
  * 默认主题：deep-space（夜）；类名 = 前缀 + token 名（.c-ink-900/.bg-card）。
  * 主题热切走 tokens.py css_variables() + refresh_css（§1.5），本文件是默认档。
  * ============================================================ */

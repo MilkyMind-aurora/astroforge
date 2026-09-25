@@ -6,8 +6,16 @@ from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Button, DataTable, RadioButton, RadioSet, Static
 from tui.service_client import ServiceClient
+from tui.theme.generated import tokens as design
 
 STATUS_FILTERS = ["全部", "pending", "running", "success", "failed", "canceled"]
+
+_TASK_GLYPH = {
+    "running": ("task.running", "aurora"),
+    "success": ("task.success", "aurora"),
+    "failed": ("task.failed", "nova"),
+    "canceled": ("task.canceled", "ink-400"),
+}
 
 
 class HistoryPage(VerticalScroll):
@@ -18,12 +26,14 @@ class HistoryPage(VerticalScroll):
         self.client = client
 
     def compose(self) -> ComposeResult:
-        yield Static("[bold cyan]任务历史[/bold cyan]  （5s 自动刷新）", id="his-title")
+        yield Static(f"[b]{design.icon('nav.history')} 任务历史[/b]  （5s 自动刷新）",
+                     id="his-title")
         yield RadioSet(
             *[RadioButton(label, value=(i == 0)) for i, label in enumerate(STATUS_FILTERS)],
             id="his-filter",
         )
-        yield Button("🔄 立即刷新", id="his-refresh", variant="default")
+        yield Button(f"{design.icon('ai.fallback')} 立即刷新", id="his-refresh",
+                     variant="default")
         yield DataTable(id="his-table")
 
     def on_mount(self) -> None:
@@ -48,9 +58,12 @@ class HistoryPage(VerticalScroll):
             return
         table.clear()
         for task in (data or {}).get("items", []):
+            glyph, color = _TASK_GLYPH.get(
+                str(task["status"]), ("task.pending", "ink-400"))
             table.add_row(
                 task["task_uuid"][:8], task["task_type"], task["mode"],
-                task["status"], f"{task['progress']}%",
+                f"[${color}]{design.icon(glyph)} {task['status']}[/]",
+                f"{task['progress']}%",
                 task.get("error_code") or "-",
             )
 

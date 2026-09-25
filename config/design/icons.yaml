@@ -46,3 +46,9 @@ misc:
   star_rank_2: "✦✦"
   star_rank_3: "✧"
   binary_star: "✦✧"
+  spinner_f1: "◐"   # 探活/加载跑圈帧（#17，1.2s 循环：◐◓◑◒）
+  spinner_f2: "◓"
+  spinner_f3: "◑"
+  spinner_f4: "◒"
+  star_dim: "·"      # 星野暗星（seed.json tier0）
+  star_mid: "•"      # 星野中亮星（tier1；tier2 复用 star_rank_1 ✦）

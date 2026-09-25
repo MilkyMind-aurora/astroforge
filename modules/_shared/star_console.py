@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 # ==== BEGIN 星空设计 token（scripts/gen_design.py 生成，禁手改）====
-# 源：config/design/tokens.yaml + icons.yaml（sha256:8b1d8e5646fd）
+# 源：config/design/tokens.yaml + icons.yaml（sha256:80f421055903）
 # 消费：CLI 全部颜色/星符一律取自本段（裸色/裸星符=违反设计契约）；
 #       富文本色用 STAR_TOKENS，纯文本降级路径不取色（字节契约不变）。
 STAR_TOKENS: dict[str, dict[str, str]] = {
@@ -116,6 +116,12 @@ STAR_ICONS: dict[str, str] = {
     "misc.star_rank_2": "✦✦",
     "misc.star_rank_3": "✧",
     "misc.binary_star": "✦✧",
+    "misc.spinner_f1": "◐",
+    "misc.spinner_f2": "◓",
+    "misc.spinner_f3": "◑",
+    "misc.spinner_f4": "◒",
+    "misc.star_dim": "·",
+    "misc.star_mid": "•",
 }
 # ==== END 星空设计 token ====
 

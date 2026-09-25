@@ -7,6 +7,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Button, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 from tui.service_client import ServiceClient
+from tui.theme.generated import tokens as design
 
 
 class PipelinePage(VerticalScroll):
@@ -18,13 +19,17 @@ class PipelinePage(VerticalScroll):
         self._pipelines: list[dict] = []
 
     def compose(self) -> ComposeResult:
-        yield Static("[bold cyan]流水线[/bold cyan]  NovaFlow 编排引擎", id="pl-title")
+        yield Static(f"[b]{design.icon('nav.pipeline')} 流水线[/b]  NovaFlow 编排引擎",
+                     id="pl-title")
         yield Static("加载模板中…", id="pl-list-wrap")
-        yield Button("▶ 运行所选流水线", id="pl-run", variant="primary")
+        yield Button(f"{design.icon('ai.done')} 运行所选流水线", id="pl-run",
+                     variant="primary")
         yield Static("", id="pl-result")
-        yield Static("[bold]保存自定义模板[/bold]（粘贴流水线 YAML）", id="pl-save-title")
+        yield Static(f"[b]{design.icon('status.hint')} 保存自定义模板[/b]（粘贴流水线 YAML）",
+                     id="pl-save-title")
         yield TextArea(id="pl-yaml")
-        yield Button("💾 保存模板", id="pl-save", variant="default")
+        yield Button(f"{design.icon('task.success')} 保存模板", id="pl-save",
+                     variant="default")
 
     def on_mount(self) -> None:
         self.run_worker(self.refresh_pipelines(), exclusive=True)
@@ -33,13 +38,13 @@ class PipelinePage(VerticalScroll):
         try:
             data = await self.client.list_pipelines()
         except Exception as exc:
-            self.query_one("#pl-result", Static).update(f"[red]模板加载失败[/red] {exc}")
+            self.query_one("#pl-result", Static).update(f"[${'nova'}]模板加载失败[/] {exc}")
             return
         self._pipelines = (data or {}).get("items", [])
         option_list = OptionList(
             *[Option(
-                f"{'🔧' if p['is_builtin'] else '⭐'} {p['title']}  "
-                f"[dim]{p['name']} · {len(p['steps'])} 步[/dim]",
+                f"{design.icon('misc.star_rank_1') if not p['is_builtin'] else design.icon('nav.pipeline')}"
+                f" {p['title']}  [dim]{p['name']} · {len(p['steps'])} 步[/dim]",
                 id=p["name"],
             ) for p in self._pipelines],
             id="pl-list",
@@ -62,23 +67,27 @@ class PipelinePage(VerticalScroll):
         if event.button.id == "pl-run":
             name = self._selected_name()
             if not name:
-                result.update("[red]❌ 请先选择流水线模板[/red]")
+                result.update(
+                    f"[${'nova'}]{design.icon('status.error')} 请先选择流水线模板[/]")
                 return
             try:
                 data = await self.client.run_pipeline(name)
             except Exception as exc:
-                result.update(f"[red]运行失败[/red] {exc}")
+                result.update(f"[${'nova'}]运行失败[/] {exc}")
                 return
             result.update(
-                f"[green]✅ 流水线已启动[/green] {data['task_uuid'][:8]}，"
-                f"Ctrl+` 跟踪日志。"
+                f"[${'aurora'}]{design.icon('task.success')} 流水线已启动[/]"
+                f" {data['task_uuid'][:8]}，Ctrl+` 跟踪日志。"
             )
         elif event.button.id == "pl-save":
             yaml_text = self.query_one("#pl-yaml", TextArea).text
             try:
                 data = await self.client.save_pipeline(yaml_text)
             except Exception as exc:
-                result.update(f"[red]保存失败[/red] {exc}")
+                result.update(f"[${'nova'}]保存失败[/] {exc}")
                 return
-            result.update(f"[green]✅ 模板已保存[/green] {data['name']}（已落 PostgreSQL）")
+            result.update(
+                f"[${'aurora'}]{design.icon('task.success')} 模板已保存[/]"
+                f" {data['name']}（已落 PostgreSQL）"
+            )
             await self.refresh_pipelines()

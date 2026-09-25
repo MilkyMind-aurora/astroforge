@@ -1,6 +1,6 @@
 // ============================================================
 // AstroForge 星空设计契约（生成物 —— scripts/gen_design.py，禁手改）
-// 源：config/design/tokens.yaml + icons.yaml（sha256:8b1d8e5646fd）
+// 源：config/design/tokens.yaml + icons.yaml（sha256:80f421055903）
 // 纪律：app/lib 内除本文件外禁止 Color(0x…)（ui_doctor grep 断言）；
 //       主题切换走 lerpPalette 全字段插值（§1.5 TWEEN_THEME 250ms）；
 //       ColorScheme 手写、禁 fromSeed（星空设计系统规格 §六）。
@@ -326,6 +326,12 @@ abstract final class AstroIcons {
   static const String miscStarRank2 = '✦✦';
   static const String miscStarRank3 = '✧';
   static const String miscBinaryStar = '✦✧';
+  static const String miscSpinnerF1 = '◐';
+  static const String miscSpinnerF2 = '◓';
+  static const String miscSpinnerF3 = '◑';
+  static const String miscSpinnerF4 = '◒';
+  static const String miscStarDim = '·';
+  static const String miscStarMid = '•';
 }
 
 /// 主题工厂（替代 theme.dart；夜档零投影、层级靠明度——规格 §二/§六）。

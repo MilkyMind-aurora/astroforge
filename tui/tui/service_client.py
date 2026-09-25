@@ -47,7 +47,13 @@ class ServiceClient:
             )
         if resp.status_code == 401:
             raise ServiceError(2001, "未认证：token 缺失或失效（重置后需重新读取）")
-        payload = resp.json()
+        try:
+            payload = resp.json()
+        except ValueError as exc:
+            # 非 JSON 响应（端口被其他进程占用/服务未就绪返回空体）给出可读诊断
+            raise ServiceError(
+                2002, f"服务响应非 JSON（HTTP {resp.status_code}，服务可能未就绪或端口被占用）"
+            ) from exc
         if payload.get("code") not in (0, None):
             raise ServiceError(payload.get("code", -1), payload.get("message", "unknown"))
         return payload.get("data")
@@ -104,6 +110,22 @@ class ServiceClient:
         data = await self._request("GET", "/api/v1/tasks?status=running&page=1")
         items = (data or {}).get("items") or []
         return items[0] if items else None
+
+    # ---- MF1 监控看板 / 表单页端点 ----
+    async def monitor_history(self, range_key: str = "1h") -> dict:
+        """历史回放：range=1h|6h|24h，返回 {range, points:[{time,cpu_percent,...}]}。"""
+        return await self._request("GET", f"/api/v1/monitor/history?range={range_key}")
+
+    async def list_templates(self) -> dict:
+        """DOCX 模板清单（转换中心模板选择器数据源）。"""
+        return await self._request("GET", "/api/v1/templates")
+
+    async def subscribe_monitor(self):
+        """连接 WS 监控通道（1s 推送），返回已就绪的 websockets 连接。"""
+        import websockets
+
+        ws_url = f"{self.base_url.replace('http', 'ws')}/ws/monitor?token={self.token}"
+        return await websockets.connect(ws_url)
 
     async def browse_files(self, path: str = "") -> dict:
         return await self._request("GET", f"/api/v1/files/browse?path={path}")
