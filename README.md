@@ -98,6 +98,23 @@ macOS 数据目录规范：`~/Library/Application Support/AstroForge/`（模型�
 | M11 macOS 适配 + 双平台 CI | 🚧 CI 就绪，实机矩阵待跑 |
 | M12 开源正式发布 v1.0 | ⏳ |
 
+**前端星空版（V1 里程碑，2026-09-25）**——设计值唯一来源 `config/design/tokens.yaml`，
+三端产物由 `scripts/gen_design.py` 生成，聚合验收 `python scripts/ui_doctor.py --full`：
+
+| 里程碑 | 状态 |
+| --- | --- |
+| MF0 设计地基（tokens/渲染器/插件机制/CI 契约门禁） | ✅ 完成 |
+| MF1 TUI 可看（星舰壳层/监控看板/占位页清零） | ✅ 完成 |
+| MF2 TUI 完整（业务页+流水线+历史+AI 抽屉+日志面板） | ✅ 完成 |
+| MF3 CLI 星幕（star_console 六件套全模块接线，stdout 契约不变） | ✅ 完成 |
+| MF3.5 交互契约补全（步骤级续跑 API 等 UX P0 前置） | ✅ 完成 |
+| MF4 Flutter 换脸（Kimi 式壳/首页/AI 抽屉，引擎休眠降级+拖拽建任务） | ✅ 完成 |
+| MF5 Flutter 完整（任务/监控弹层/历史/设置，IA 8→5） | ✅ 完成 |
+| MF6 收口（ui_doctor 全绿/双主题截图/动效勾账） | ✅ 完成（动效 26 项：20 实现/2 部分/5 未实现，见 `docs/design/motion-checkoff.md`） |
+
+交付留档：双主题截图 `docs/design/screenshots/`（golden 冻结帧）· 动效勾账
+`docs/design/motion-checkoff.md` · 星仔规格 `docs/design/mascot.md`。
+
 ## 验证工具
 
 ```bash

@@ -81,14 +81,16 @@ class ConnectionState {
 }
 
 class ConnectionController extends StateNotifier<ConnectionState> {
-  ConnectionController() : super(const ConnectionState(
+  /// [ws] 仅测试/金测注入（注入态不发起真实连接，断连态由注入方控制）；
+  /// 生产路径不传参，行为与历史版本完全一致（构造即连接 /ws/monitor）。
+  ConnectionController({ForgeWebSocket? ws}) : super(const ConnectionState(
           status: WsStatus.disconnected, hasConnectedOnce: false)) {
-    _ws = ForgeWebSocket(path: '/ws/monitor')
+    _ws = (ws ?? ForgeWebSocket(path: '/ws/monitor'))
       ..status.addListener(_onStatus)
       // 监控采样入滚动窗口（仪表胶囊 + 监控弹层实时数据源，IA 裁决：
       // 监控降级为右上胶囊+弹层后 /ws/monitor 由壳层常驻消费）
       ..messages.listen(_onMonitorMessage);
-    unawaited(_ws.connect());
+    if (ws == null) unawaited(_ws.connect());
   }
 
   late final ForgeWebSocket _ws;

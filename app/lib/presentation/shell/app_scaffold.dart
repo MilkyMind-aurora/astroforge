@@ -105,6 +105,12 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
           body: DragTaskLayer(
             child: Stack(
               children: [
+                // S0 页面底（MF6 双主题金测发现：Scaffold 透明 + 星野画布透明，
+                // 此前无任何层涂 bg——夜档被 #05070F≈纯黑掩盖，昼档直接露出
+                // 黑底白卡。星点必须落在 bg 之上、内容卡之下，对比度纪律不变）
+                Positioned.fill(
+                  child: ColoredBox(color: palette.bg),
+                ),
                 // 星野背景（seed.json/uSeed 驱动；失焦暂停；弹层打开流星让位；
                 // 设置页 appearance.starfield 开关即时生效）
                 if (starfieldOn) const Positioned.fill(child: StarfieldView()),
