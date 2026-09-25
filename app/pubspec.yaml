@@ -38,6 +38,8 @@ dependencies:
   # 后续 Phase 使用：文件选择（解析/转换中心）、客户端自身偏好存储（仅主题/窗口/服务端口，不存业务数据）
   file_picker: ^12.1.2
   shared_preferences: ^2.5.5
+  animations: ^3.0.0
+  desktop_drop: ^0.8.4
 
 dev_dependencies:
   flutter_test:

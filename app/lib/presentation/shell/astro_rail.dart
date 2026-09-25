@@ -122,10 +122,12 @@ class _AstroRailState extends ConsumerState<AstroRail>
             ),
           ),
           const Spacer(),
-          // ---- 轨底：主题切换 + 星仔头像 ----
+          // ---- 轨底：主题切换 + 星仔头像（appearance.mascot=false 全隐；
+          //      纯图形彩蛋保留——星仔规格 §五）----
           const _ThemeToggle(),
           const SizedBox(height: 8),
-          const _RailAvatar(),
+          if (ref.watch(appearanceProvider).mascot)
+            const _RailAvatar(),
           const SizedBox(height: 12),
         ],
       ),

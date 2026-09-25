@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 /// 壳层键盘导航（§5.1 键盘表；UX 评审 P0-3——语义与 TUI 同名映射）。
-/// 已落位：Ctrl+1~8 切页 / Ctrl+Shift+A 星伴抽屉 / Ctrl+Enter 发送 /
+/// MF5 全集落位：Ctrl+1~5 切页（IA 8→5）/ Ctrl+K 命令面板 /
+/// Ctrl+` 日志面板 / Ctrl+Shift+A 星伴抽屉 / Ctrl+Enter 发送 /
 /// Ctrl+I 聚焦输入条 / F5 刷新当前页 / Esc 逐层退出。
-/// 未落位（组件未建，MF5 补）：Ctrl+K 命令面板、Ctrl+` 日志面板。
 class OpenAiDrawerIntent extends Intent {
   const OpenAiDrawerIntent();
 }
@@ -31,23 +31,35 @@ class EscapeLayerIntent extends Intent {
   const EscapeLayerIntent();
 }
 
-/// 壳层快捷键表（Ctrl+Shift+A 的真实 Shortcuts 绑定——修复旧「仅 tooltip」假绑定）。
+/// 命令面板（Ctrl+K；TUI `/` 同名映射）。
+class OpenPaletteIntent extends Intent {
+  const OpenPaletteIntent();
+}
+
+/// 日志面板（Ctrl+`；TUI Ctrl+` 同名映射）。
+class OpenLogPanelIntent extends Intent {
+  const OpenLogPanelIntent();
+}
+
+/// 壳层快捷键表（Ctrl+Shift+A 真实 Shortcuts 绑定——修复旧「仅 tooltip」假绑定）。
 Map<ShortcutActivator, Intent> astroShortcuts() => {
       // 星伴 AI 抽屉（TUI A 键同名映射）
       const SingleActivator(LogicalKeyboardKey.keyA,
           control: true, shift: true): const OpenAiDrawerIntent(),
-      // 切页 Ctrl+1~8（跟随现行 8 目的地 IA；三合一后改 Ctrl+1~5）
+      // 切页 Ctrl+1~5（IA 8→5：首页/任务/流水线/历史/设置）
       for (final (i, key) in const [
         (0, LogicalKeyboardKey.digit1),
         (1, LogicalKeyboardKey.digit2),
         (2, LogicalKeyboardKey.digit3),
         (3, LogicalKeyboardKey.digit4),
         (4, LogicalKeyboardKey.digit5),
-        (5, LogicalKeyboardKey.digit6),
-        (6, LogicalKeyboardKey.digit7),
-        (7, LogicalKeyboardKey.digit8),
       ])
         SingleActivator(key, control: true): NavBranchIntent(i),
+      // 命令面板 / 日志面板
+      const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+          const OpenPaletteIntent(),
+      const SingleActivator(LogicalKeyboardKey.backquote, control: true):
+          const OpenLogPanelIntent(),
       // 发送 / 全局聚焦输入条 / 刷新
       const SingleActivator(LogicalKeyboardKey.enter, control: true):
           const SendIntent(),

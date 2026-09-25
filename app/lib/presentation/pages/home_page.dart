@@ -137,6 +137,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  /// 能力胶囊 → 任务页预填（IA 8→5：采集/解析/转换三合一「任务」页）。
+  void _goTasks(String taskType, Map<String, dynamic> config) {
+    ref.read(taskPrefillProvider.notifier).state =
+        TaskPrefill(taskType: taskType, config: config, reason: '能力胶囊');
+    context.go('/tasks');
+  }
+
   void _cancelWake() {
     _wakeTimer?.cancel();
     _elapsedTimer?.cancel();
@@ -222,9 +229,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             ref.read(envCheckProvider.notifier).refresh();
             ref.read(connectionProvider.notifier).nudgeReconnect();
           }) : _buildEmptyState(context, palette, healthData),
-          // 右上角体检胶囊（9/9 ✦；异常时熔金 7/9 ▲，点击展开九宫格卡）
+          // 右上角体检胶囊（9/9 ✦；异常时熔金 7/9 ▲，点击展开九宫格卡）。
+          // 顶层留给壳层仪表胶囊（IA 裁决：监控常驻位），体检胶囊下移一档。
           Positioned(
-            top: AstroSpace.window,
+            top: AstroSpace.window + 44,
             right: AstroSpace.window,
             child: _EnvBadge(data: healthData, palette: palette),
           ),
@@ -296,17 +304,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                             _Capability(
                               glyph: AstroIcons.navSpider,
                               label: '爬取文档站',
-                              onTap: () => context.go('/spider'),
+                              onTap: () => _goTasks('spider_single', const {}),
                             ),
                             _Capability(
                               glyph: AstroIcons.navParser,
                               label: '解析 PDF',
-                              onTap: () => context.go('/parser'),
+                              onTap: () => _goTasks('mineru', const {}),
                             ),
                             _Capability(
                               glyph: AstroIcons.navConverter,
                               label: '转 Word',
-                              onTap: () => context.go('/converter'),
+                              onTap: () => _goTasks('md2docx', const {}),
                             ),
                             _Capability(
                               glyph: AstroIcons.navPipeline,

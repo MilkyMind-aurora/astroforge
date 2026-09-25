@@ -98,4 +98,97 @@ void main() {
 
     expect(invoked, 0);
   });
+
+  testWidgets('Ctrl+6 不再切页（IA 8→5 后仅 Ctrl+1~5）', (tester) async {
+    var lastIndex = -1;
+    await tester.pumpWidget(MaterialApp(
+      home: Shortcuts(
+        shortcuts: astroShortcuts(),
+        child: Actions(
+          actions: {
+            NavBranchIntent: CallbackAction<NavBranchIntent>(
+              onInvoke: (intent) {
+                lastIndex = intent.index;
+                return null;
+              },
+            ),
+          },
+          child: Focus(
+            autofocus: true,
+            child: const Scaffold(body: SizedBox()),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.digit6);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.digit6);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(lastIndex, -1);
+  });
+
+  testWidgets('Ctrl+K 触发命令面板意图', (tester) async {
+    var opened = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Shortcuts(
+        shortcuts: astroShortcuts(),
+        child: Actions(
+          actions: {
+            OpenPaletteIntent: CallbackAction<OpenPaletteIntent>(
+              onInvoke: (_) {
+                opened++;
+                return null;
+              },
+            ),
+          },
+          child: Focus(
+            autofocus: true,
+            child: const Scaffold(body: SizedBox()),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(opened, 1);
+  });
+
+  testWidgets('Ctrl+` 触发日志面板意图', (tester) async {
+    var opened = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Shortcuts(
+        shortcuts: astroShortcuts(),
+        child: Actions(
+          actions: {
+            OpenLogPanelIntent: CallbackAction<OpenLogPanelIntent>(
+              onInvoke: (_) {
+                opened++;
+                return null;
+              },
+            ),
+          },
+          child: Focus(
+            autofocus: true,
+            child: const Scaffold(body: SizedBox()),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.backquote);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.backquote);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(opened, 1);
+  });
 }
