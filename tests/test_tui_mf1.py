@@ -14,15 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tui"))
 
 import pytest  # noqa: E402
-from tui.app import (  # noqa: E402
-    NAV_DEBOUNCE_S,
-    NAV_HEALTH,
-    PAGES,
-    _seg,
-    _spinner_frame,
-)
-from tui.pages.home import check_glyph, greeting_by_hour, render_grid  # noqa: E402
-from tui.pages.monitor import (  # noqa: E402
+from tui.app import NAV_DEBOUNCE_S  # noqa: E402
+from tui.plugins import collect_plugins  # noqa: E402
+from tui.plugins.home.page import check_glyph, greeting_by_hour, render_grid  # noqa: E402
+from tui.plugins.monitor.page import (  # noqa: E402
     MonitorState,
     derive_alerts,
     format_kpi_row,
@@ -30,6 +25,8 @@ from tui.pages.monitor import (  # noqa: E402
     mem_severity,
     scan_processes,
 )
+from tui.shell.format import seg as _seg  # noqa: E402
+from tui.shell.format import spinner_frame as _spinner_frame  # noqa: E402
 from tui.theme import astro_theme  # noqa: E402
 from tui.theme.generated import tokens as design  # noqa: E402
 from tui.ui.starfield import render_starfield  # noqa: E402
@@ -187,6 +184,7 @@ def test_导航去抖与跑圈取自生成物() -> None:
 
 
 def test_导航表_8页与体检映射齐备() -> None:
-    assert [key for key, _i, _l in PAGES] == [
+    pages = collect_plugins()
+    assert [p.key for p in pages] == [
         "home", "spider", "parser", "converter", "pipeline", "monitor", "history", "settings"]
-    assert set(NAV_HEALTH) == {key for key, _i, _l in PAGES}
+    assert all(hasattr(p, "env_dep") for p in pages)  # 健康点 env_dep 与体检同源

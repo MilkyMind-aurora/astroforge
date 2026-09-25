@@ -65,8 +65,9 @@ class ServiceClient:
     async def env_check(self) -> dict:
         return await self._request("GET", "/api/v1/system/env-check")
 
-    async def list_tasks(self, page: int = 1, status: str | None = None) -> dict:
-        path = f"/api/v1/tasks?page={page}"
+    async def list_tasks(self, page: int = 1, status: str | None = None,
+                         page_size: int = 20) -> dict:
+        path = f"/api/v1/tasks?page={page}&page_size={page_size}"
         if status:
             path += f"&status={status}"
         return await self._request("GET", path)
@@ -91,6 +92,30 @@ class ServiceClient:
 
     async def task_detail(self, task_uuid: str) -> dict:
         return await self._request("GET", f"/api/v1/tasks/{task_uuid}")
+
+    async def task_logs(self, task_uuid: str, offset: int = 0) -> dict:
+        """REST 日志补拉（MF2 日志面板断线兜底，方案 §3.6）。"""
+        return await self._request("GET", f"/api/v1/tasks/{task_uuid}/logs?offset={offset}")
+
+    async def cancel_task(self, task_uuid: str) -> dict:
+        return await self._request("POST", f"/api/v1/tasks/{task_uuid}/cancel")
+
+    async def retry_task(self, task_uuid: str) -> dict:
+        """任务级重试（服务契约=新任务）；步骤级续跑见 retry_step。"""
+        return await self._request("POST", f"/api/v1/tasks/{task_uuid}/retry")
+
+    async def retry_step(self, task_uuid: str, step_index: int) -> dict:
+        """步骤级续跑（V1.1-6 契约：前序产物保留，原地更新同一任务）。"""
+        return await self._request("POST", f"/api/v1/tasks/{task_uuid}/steps/{step_index}/retry")
+
+    # ---- MF2 星伴引擎 ----
+    async def engine_status(self) -> dict:
+        return await self._request("GET", "/api/v1/ai/engine/status")
+
+    async def switch_model(self, model_key: str) -> dict:
+        """模型热切换代理（模型胶囊，方案 §3.6；首载 9B 耗时较长）。"""
+        return await self._request("POST", "/api/v1/ai/model/switch",
+                                   {"model_key": model_key})
 
     # ---- Phase 1 收尾新增端点 ----
     async def list_app_settings(self) -> dict:
@@ -119,6 +144,10 @@ class ServiceClient:
     async def list_templates(self) -> dict:
         """DOCX 模板清单（转换中心模板选择器数据源）。"""
         return await self._request("GET", "/api/v1/templates")
+
+    async def template_preview(self, template_key: str) -> dict:
+        """模板预览说明（/templates/{key}/preview：TOC/页码配置+在位状态）。"""
+        return await self._request("GET", f"/api/v1/templates/{template_key}/preview")
 
     async def subscribe_monitor(self):
         """连接 WS 监控通道（1s 推送），返回已就绪的 websockets 连接。"""

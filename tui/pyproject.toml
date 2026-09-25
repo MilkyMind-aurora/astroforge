@@ -18,5 +18,18 @@ dependencies = [
 [project.scripts]
 astroforge-tui = "tui.app:main"
 
+# 页面插件注册（方案 §2.4）：TUI 启动扫描 entry_points 组 astroforge.tui_pages
+# 与内置 8 页合并（同 key 内置优先），config/design/pages.yaml 做显隐/排序覆盖；
+# 第三方私有页发布为独立 pip 包挂同一组即可进 UI，不动主干。
+[project.entry-points."astroforge.tui_pages"]
+home = "tui.plugins.home:plugin"
+spider = "tui.plugins.spider:plugin"
+parser = "tui.plugins.parser:plugin"
+converter = "tui.plugins.converter:plugin"
+pipeline = "tui.plugins.pipeline:plugin"
+monitor = "tui.plugins.monitor:plugin"
+history = "tui.plugins.history:plugin"
+settings = "tui.plugins.settings:plugin"
+
 [tool.setuptools.packages.find]
 include = ["tui*"]

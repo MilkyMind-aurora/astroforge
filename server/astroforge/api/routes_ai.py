@@ -162,3 +162,36 @@ async def messages(conversation_id: int) -> dict:
 @router.get("/engine/status", dependencies=[deps.TokenDep])
 async def engine_status(ctx: deps.CtxDep) -> dict:
     return ok(await watcher.probe_status(ctx.settings))
+
+
+class ModelSwitchBody(BaseModel):
+    model_key: str
+
+
+# 模型胶囊清单（方案 §3.6/§5.6）：键与 modules/ai_engine MODEL_FILES 同源；
+# 服务端持白名单，未知键拒绝透传给引擎（与 app_settings 白名单同一纪律）
+KNOWN_MODELS: dict[str, str] = {
+    "qwen2b": "常驻 · 日常指令",
+    "ornith9b": "按需 · 复杂拆解 · ≈5.6GB",
+}
+
+
+@router.post("/model/switch", dependencies=[deps.TokenDep])
+async def model_switch(body: ModelSwitchBody, ctx: deps.CtxDep) -> dict:
+    """模型热切换代理：转发引擎 /v1/model/load（首载 9B 耗时较长）。
+
+    引擎不可达统一转 4004 信封；切换后当前模型经 /ai/engine/status
+    （health.current_model）回读。
+    """
+    if body.model_key not in KNOWN_MODELS:
+        raise ApiError(
+            ErrorCode.MISSING_PARAM,
+            f"未知模型: {body.model_key}（可选: {', '.join(sorted(KNOWN_MODELS))}）",
+        )
+    from astroforge.ai.engine_client import EngineUnavailable
+
+    try:
+        result = await ctx.ai_client.model_load(body.model_key)
+    except EngineUnavailable as exc:
+        raise ApiError(ErrorCode.AI_ENGINE_UNREACHABLE, f"AI 引擎不可达: {exc}") from exc
+    return ok({"model_key": body.model_key, "engine": result})

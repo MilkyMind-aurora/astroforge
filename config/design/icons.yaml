@@ -39,6 +39,9 @@ task:
   success: "✓"
   failed: "✕"
   canceled: "⊘"
+  pdf: "⬇"          # 采集中心·PDF 批量（§3.3 四类任务星符）
+  table: "▦"        # 采集中心·表格抓取（§3.3 四类任务星符）
+  step_cursor: "▶"  # 流水线时间线当前步骤游标（§3.4 `◈─▶ 转换 DOCX`）
 
 misc:
   meteor: "☄"
@@ -46,6 +49,8 @@ misc:
   star_rank_2: "✦✦"
   star_rank_3: "✧"
   binary_star: "✦✧"
+  caret_down: "▾"    # 模型胶囊/折叠区下拉指示（§3.6 模型胶囊 `qwen2b ▾`）
+  caret_right: "▸"   # 折叠区收起态指示（§3.3 「✧ 高级」）
   spinner_f1: "◐"   # 探活/加载跑圈帧（#17，1.2s 循环：◐◓◑◒）
   spinner_f2: "◓"
   spinner_f3: "◑"

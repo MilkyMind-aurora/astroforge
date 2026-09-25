@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""监控看板 · 星象台（方案 §3.4，MF1 最大欠账清偿）。
+"""监控看板 · 星象台（方案 §3.4，插件页：tui/plugins/monitor/，MF1 落地 MF2 迁入）。
 
 - KPI 行：CPU % / 内存 GB / 磁盘 MB/s / 运行任务数（等宽数字，1s WS 驱动，
   页面刷新节流 500ms）
@@ -30,12 +30,13 @@ from textual.widgets import (
     Static,
 )
 from textual.widgets.option_list import Option
+
 from tui.theme.generated import tokens as design
 
 WINDOW_POINTS = 60          # Sparkline 滚动窗口（方案 §3.4）
 POLL_INTERVAL = 0.5         # KPI/曲线刷新节流 500ms
 PROC_INTERVAL = 5.0         # 进程表扫描周期
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 # 模块 cli.py 路径段 → conda 环境名（进程表「环境」列推断；task_scheduler.MODULE_MAP 同源）
 _MODULE_ENVS = {
@@ -288,7 +289,7 @@ class MonitorPage(VerticalScroll):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """告警行 Enter → 跳转任务历史（对齐「Enter 跳转对应任务」）。"""
         if event.option_id and event.option_id.startswith("alert-") and self._app is not None:
-            self._app.switch_page(6)
+            self._app.switch_page_by_key("history")
 
 
 class MonitorState(dict):

@@ -177,6 +177,30 @@ class Scheduler:
             return None
         return self.create_task(old.task_type, old.mode, old.title, old.config)
 
+    def retry_step(self, task_uuid: str, step_index: int) -> TaskRecord | None:
+        """步骤级续跑（UX P0-2 / 方案 V1.1-6）：失败任务从失败步骤原地续跑。
+
+        语义：仅失败任务的失败步骤可重试；已完成步骤状态保留（_run_record
+        按 status=success 跳过，产物不重算）；同一任务原地更新，不裂成两条。
+        任务态在内存（服务重启后内存态丢失，续跑随任务态一起不可用）。
+        """
+        record = self._tasks.get(task_uuid)
+        if record is None or record.status != "failed":
+            return None
+        if not 0 <= step_index < len(record.steps):
+            return None
+        if record.steps[step_index].get("status") != "failed":
+            return None
+        record.steps[step_index]["status"] = "pending"
+        record.status = "pending"
+        record.error_code = None
+        record.error_message = None
+        record.finished_at = None
+        self._queue.put_nowait(record.task_uuid)
+        self._broadcast(record, "status")
+        self._persist_status(record)
+        return record
+
     # ---- 执行循环（串行，方案 2.4 机制 4）----
     async def _worker_loop(self) -> None:
         while True:
@@ -203,15 +227,20 @@ class Scheduler:
 
         steps = record.steps
         total = max(1, len(steps))
+        result: dict[str, Any] | None = None
         for index, step in enumerate(steps):
             if record.cancel_event.is_set():
                 record.status, record.error_message = "canceled", "任务已取消"
                 break
+            if step.get("status") == "success":
+                # 步骤级续跑：已完成步骤产物保留，不重跑（retry_step 语义）
+                continue
             task_type = step["task_type"]
             mapping = MODULE_MAP.get(task_type)
             if mapping is None:
                 record.status, record.error_code = "failed", 1001
                 record.error_message = f"未知任务类型: {task_type}"
+                step["status"] = "failed"  # 任务失败必有失败步骤（续跑语义一致）
                 break
             env_name, script_rel = mapping
             step["status"] = "running"
@@ -243,7 +272,8 @@ class Scheduler:
             )
             step_ok = returncode == 0 and (result is None or result.get("code") == 0)
             step["status"] = "success" if step_ok else "failed"
-            record.progress = int((index + 1) / total * 100)
+            completed = sum(1 for s in steps if s.get("status") == "success")
+            record.progress = int(completed / total * 100)
             self._broadcast(record, "progress")
             if not step_ok:
                 record.status = "failed"

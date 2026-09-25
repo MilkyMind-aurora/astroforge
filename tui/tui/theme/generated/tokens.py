@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # ============================================================
 # AstroForge TUI 设计常量（生成物 —— scripts/gen_design.py，禁手改）
-# 源：config/design/tokens.yaml + icons.yaml（sha256:80f421055903）
+# 源：config/design/tokens.yaml + icons.yaml（sha256:06b559db8ba2）
 # 消费：壳层/页面一律引用语义名（design.DARK["aurora"]、design.icons.nav.home、
 #       design.icon("nav.home")），禁散落硬编码色值与星符（§3.7 门禁 grep 断言）。
 # ============================================================
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 TOKENS_VERSION = 1
-SOURCE_SHA256 = "80f421055903"
+SOURCE_SHA256 = "06b559db8ba2"
 DEFAULT_THEME = "deep-space"
 THEMES: tuple[str, ...] = ("dawn", "deep-space",)
 THEME_MODE: dict[str, str] = {
@@ -278,11 +278,16 @@ ICONS: dict[str, str] = {
     "task.success": "✓",
     "task.failed": "✕",
     "task.canceled": "⊘",
+    "task.pdf": "⬇",
+    "task.table": "▦",
+    "task.step_cursor": "▶",
     "misc.meteor": "☄",
     "misc.star_rank_1": "✦",
     "misc.star_rank_2": "✦✦",
     "misc.star_rank_3": "✧",
     "misc.binary_star": "✦✧",
+    "misc.caret_down": "▾",
+    "misc.caret_right": "▸",
     "misc.spinner_f1": "◐",
     "misc.spinner_f2": "◓",
     "misc.spinner_f3": "◑",

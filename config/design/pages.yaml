@@ -1,0 +1,17 @@
+# ============================================================
+# TUI 页面显隐/排序（方案 §2.2 / §2.4：L1 数据插件，覆盖 entry_points 默认）
+# 语义：visible=false 的页面从侧边栏与命令面板同时隐藏；order 越小越靠前；
+#       缺键回落插件自带 sort；整文件缺失=全部可见、按插件 sort 排。
+# 消费端：tui/tui/plugins/__init__.py collect_plugins()
+# ============================================================
+version: 1
+
+pages:
+  home:      { visible: true, order: 1 }
+  spider:    { visible: true, order: 2 }
+  parser:    { visible: true, order: 3 }
+  converter: { visible: true, order: 4 }
+  pipeline:  { visible: true, order: 5 }
+  monitor:   { visible: true, order: 6 }
+  history:   { visible: true, order: 7 }
+  settings:  { visible: true, order: 8 }

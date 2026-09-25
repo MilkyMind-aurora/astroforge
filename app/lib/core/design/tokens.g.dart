@@ -1,6 +1,6 @@
 // ============================================================
 // AstroForge 星空设计契约（生成物 —— scripts/gen_design.py，禁手改）
-// 源：config/design/tokens.yaml + icons.yaml（sha256:80f421055903）
+// 源：config/design/tokens.yaml + icons.yaml（sha256:06b559db8ba2）
 // 纪律：app/lib 内除本文件外禁止 Color(0x…)（ui_doctor grep 断言）；
 //       主题切换走 lerpPalette 全字段插值（§1.5 TWEEN_THEME 250ms）；
 //       ColorScheme 手写、禁 fromSeed（星空设计系统规格 §六）。
@@ -321,11 +321,16 @@ abstract final class AstroIcons {
   static const String taskSuccess = '✓';
   static const String taskFailed = '✕';
   static const String taskCanceled = '⊘';
+  static const String taskPdf = '⬇';
+  static const String taskTable = '▦';
+  static const String taskStepCursor = '▶';
   static const String miscMeteor = '☄';
   static const String miscStarRank1 = '✦';
   static const String miscStarRank2 = '✦✦';
   static const String miscStarRank3 = '✧';
   static const String miscBinaryStar = '✦✧';
+  static const String miscCaretDown = '▾';
+  static const String miscCaretRight = '▸';
   static const String miscSpinnerF1 = '◐';
   static const String miscSpinnerF2 = '◓';
   static const String miscSpinnerF3 = '◑';

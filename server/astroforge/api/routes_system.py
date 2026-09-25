@@ -79,7 +79,16 @@ WRITABLE_KEYS: dict[str, tuple] = {
     "memory_warning_gb": (int, float),
     "memory_critical_gb": (int, float),
     "request_interval": (int, float),
+    # appearance.*（方案 §2.6 / V1-B.6）：TUI 与 Flutter 双端同源的外观设置；
+    # 默认主题 deep-space 为 §2.2 内置夜主题（唯一事实源 config/design/themes/）
+    "appearance.theme": (str,),
+    "appearance.starfield": (bool,),
+    "appearance.mascot": (bool,),
 }
+
+# 外观组键（config-summary appearance 段数据源；缺省值对应 §2.2 内置夜主题）
+APPEARANCE_KEYS = ("appearance.theme", "appearance.starfield", "appearance.mascot")
+APPEARANCE_DEFAULTS: dict[str, object] = {"theme": "deep-space", "starfield": True}
 
 
 @router.get("/system/config-summary", dependencies=[deps.TokenDep])
@@ -100,7 +109,28 @@ async def config_summary(ctx: deps.CtxDep) -> dict:
         "system": {"max_memory_gb": s.system.max_memory_gb,
                    "task_concurrency": s.system.task_concurrency,
                    "mascot_enabled": s.system.mascot_enabled},
+        "appearance": await _appearance_summary(),
     })
+
+
+async def _appearance_summary() -> dict:
+    """外观组生效值：app_settings 覆盖优先，缺省回落 §2.2 内置夜主题。"""
+    appearance: dict[str, object] = dict(APPEARANCE_DEFAULTS)
+    appearance["mascot"] = True
+    try:
+        from astroforge.db import engine as db_engine
+        from astroforge.db.repositories import app_settings as settings_repo
+
+        async with db_engine.get_sessionmaker()() as session:  # type: ignore[misc]
+            overrides = await settings_repo.list_all(session, APPEARANCE_KEYS)
+        for key, payload in overrides.items():
+            name = key.split(".", 1)[1]
+            value = payload.get("value") if isinstance(payload, dict) else payload
+            if value is not None:
+                appearance[name] = value
+    except Exception:
+        pass  # 数据库不可用回落缺省（与 list_app_settings 降级同语义）
+    return appearance
 
 
 @router.get("/app-settings", dependencies=[deps.TokenDep])

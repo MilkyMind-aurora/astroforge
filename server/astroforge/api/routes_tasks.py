@@ -82,6 +82,19 @@ async def retry_task(task_uuid: str, ctx: deps.CtxDep) -> dict:
     return ok(record.to_dict())
 
 
+@router.post("/{task_uuid}/steps/{step_index}/retry", dependencies=[deps.TokenDep])
+async def retry_task_step(task_uuid: str, step_index: int, ctx: deps.CtxDep) -> dict:
+    """步骤级续跑（UX P0-2 / 方案 V1.1-6 服务端唯一补的 API）：
+    失败任务从失败步骤原地续跑，已完成步骤状态与产物保留，不裂成新任务。"""
+    record = ctx.scheduler.retry_step(task_uuid, step_index)
+    if record is None:
+        raise ApiError(
+            ErrorCode.MISSING_PARAM,
+            "任务不存在或步骤不可续跑（仅失败任务的失败步骤可重试）",
+        )
+    return ok(record.to_dict())
+
+
 @router.get("/{task_uuid}/steps", dependencies=[deps.TokenDep])
 async def task_steps(task_uuid: str, ctx: deps.CtxDep) -> dict:
     record = ctx.scheduler.get(task_uuid)

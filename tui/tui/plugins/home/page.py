@@ -14,6 +14,7 @@ import datetime
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Static
+
 from tui.theme.generated import tokens as design
 from tui.ui.mascot import get_frame, get_quote
 from tui.ui.starfield import render_starfield
@@ -60,7 +61,7 @@ def render_grid(items: list[dict], width: int = 30) -> list[str]:
 class HomePage(VerticalScroll):
     """星桥 Hub：体检九宫格 + 服务核心行 + 快捷 chips。"""
 
-    def __init__(self, client, app_ref=None) -> None:  # noqa: ANN001（App 存在循环导入，宽型注解）
+    def __init__(self, client, app_ref=None) -> None:  # noqa: ANN001（App 循环依赖，宽型注解）
         super().__init__(id="page-home")
         self.client = client
         self._app = app_ref
@@ -148,9 +149,9 @@ class HomePage(VerticalScroll):
         if self._app is None:
             return
         if event.button.id == "chip-spider":
-            self._app.switch_page(1)
+            self._app.switch_page_by_key("spider")
         elif event.button.id == "chip-pipeline":
-            self._app.switch_page(4)
+            self._app.switch_page_by_key("pipeline")
         elif event.button.id == "chip-cmd":
             self._app.run_action("command_palette")
         elif event.button.id == "chip-ai":
