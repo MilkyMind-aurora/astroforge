@@ -178,24 +178,29 @@ class Scheduler:
         return self.create_task(old.task_type, old.mode, old.title, old.config)
 
     def retry_step(self, task_uuid: str, step_index: int) -> TaskRecord | None:
-        """步骤级续跑（UX P0-2 / 方案 V1.1-6）：失败任务从失败步骤原地续跑。
+        """步骤级续跑（UX P0-2 / 方案 V1.1-6 / MF3.5）：终态任务原地续跑。
 
-        语义：仅失败任务的失败步骤可重试；已完成步骤状态保留（_run_record
-        按 status=success 跳过，产物不重算）；同一任务原地更新，不裂成两条。
+        语义（MF3.5 交互契约补全）：仅 failed/canceled 任务的「失败」或
+        「未运行（pending）」步骤可续跑；已完成步骤状态与产物保留（
+        _run_record 按 status=success 跳过，不重算）；running/pending 任务
+        拒绝（防重复入队双跑）；同一任务原地更新，不裂成两条。
+        取消残留的 cancel_event 必须清除——运行中取消会把任务打成 failed
+        且事件仍置位，不清除则续跑在执行循环顶端被立刻再次取消。
         任务态在内存（服务重启后内存态丢失，续跑随任务态一起不可用）。
         """
         record = self._tasks.get(task_uuid)
-        if record is None or record.status != "failed":
+        if record is None or record.status not in {"failed", "canceled"}:
             return None
         if not 0 <= step_index < len(record.steps):
             return None
-        if record.steps[step_index].get("status") != "failed":
+        if record.steps[step_index].get("status") not in {"failed", "pending"}:
             return None
         record.steps[step_index]["status"] = "pending"
         record.status = "pending"
         record.error_code = None
         record.error_message = None
         record.finished_at = None
+        record.cancel_event.clear()
         self._queue.put_nowait(record.task_uuid)
         self._broadcast(record, "status")
         self._persist_status(record)

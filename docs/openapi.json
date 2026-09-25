@@ -758,6 +758,76 @@
         }
       }
     },
+    "/api/v1/tasks/{task_uuid}/steps/{step_index}/retry": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Retry Task Step",
+        "description": "步骤级续跑（UX P0-2 / 方案 V1.1-6 / MF3.5 交互契约补全）：\n失败/取消任务从失败或未运行步骤原地续跑，已完成步骤状态与产物保留，\n不裂成新任务。错误码分段合规：任务不存在=4001（资源），\n步骤/任务状态不合法=1001（参数）。",
+        "operationId": "retry_task_step_api_v1_tasks__task_uuid__steps__step_index__retry_post",
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Uuid"
+            }
+          },
+          {
+            "name": "step_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Step Index"
+            }
+          },
+          {
+            "name": "x-astroforge-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Astroforge-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Retry Task Step Api V1 Tasks  Task Uuid  Steps  Step Index  Retry Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/{task_uuid}/steps": {
       "get": {
         "tags": [
@@ -1640,6 +1710,68 @@
           }
         }
       }
+    },
+    "/api/v1/ai/model/switch": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Model Switch",
+        "description": "模型热切换代理：转发引擎 /v1/model/load（首载 9B 耗时较长）。\n\n引擎不可达统一转 4004 信封；切换后当前模型经 /ai/engine/status\n（health.current_model）回读。",
+        "operationId": "model_switch_api_v1_ai_model_switch_post",
+        "parameters": [
+          {
+            "name": "x-astroforge-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Astroforge-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelSwitchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Model Switch Api V1 Ai Model Switch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1716,6 +1848,19 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ModelSwitchBody": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_key"
+        ],
+        "title": "ModelSwitchBody"
       },
       "RunPipelineBody": {
         "properties": {
