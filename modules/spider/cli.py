@@ -3,17 +3,20 @@
 约定：python cli.py --config <config.json> --output <result.json>
 task_type: spider_single | spider_site | spider_pdf | spider_table
 URL 一律先经 url_guard 外联安全校验（仅允许 http/https）。
+星幕输出（MF3）：横幅/阶段/进度/收尾卡经 cli_utils→star_console（TTY 态富文本，
+管道态纯文本）；[INFO]/[ERROR] 前缀与结果 JSON 契约字节不变。
 """
 from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 import fetch  # 同目录模块
 import site_crawl
-from cli_utils import error, fail, info, load_json, ok, save_json
+from cli_utils import announce_result, banner, fail, info, load_json, ok, save_json, stage
 from url_guard import UrlGuardError, validate_external_url
 
 
@@ -31,6 +34,7 @@ def run_single(cfg: dict) -> dict:
 
 def run_site(cfg: dict) -> dict:
     url = validate_external_url(cfg.get("url"))
+    stage("整站爬取（侧边栏结构化优先）")
     return site_crawl.crawl_site(
         url,
         output_dir=Path(cfg.get("output_dir", "output/site")),
@@ -47,6 +51,7 @@ def run_site(cfg: dict) -> dict:
 
 def run_pdf(cfg: dict) -> dict:
     url = validate_external_url(cfg.get("url"))
+    stage("PDF 批量下载")
     output_dir = Path(cfg.get("output_dir", "output/pdf"))
     output_dir.mkdir(parents=True, exist_ok=True)
     retry = int(cfg.get("auto_retry", 3))
@@ -60,6 +65,7 @@ def run_table(cfg: dict) -> dict:
 
 
 def main() -> int:
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description="AstroForge 采集模块（Scrapling/回退 urllib）")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output", required=True)
@@ -67,6 +73,7 @@ def main() -> int:
 
     cfg = load_json(args.config)
     task_type = cfg.get("task_type")
+    banner("spider", " · ".join(filter(None, ("env_spider", str(task_type or "")))))
     handlers = {
         "spider_single": run_single,
         "spider_site": run_site,
@@ -82,9 +89,9 @@ def main() -> int:
             result = handlers[task_type](cfg)
         except UrlGuardError as exc:
             result = fail(1002, f"URL 未通过安全校验: {exc}")
-        except Exception as exc:  # 模块崩溃不裸奔，统一转结果 JSON
-            error(f"执行异常: {exc}")
+        except Exception as exc:  # 模块崩溃不裸奔，统一转结果 JSON（[ERROR] 行由收尾卡统一发）
             result = fail(3003, f"模块执行异常: {exc}")
+    announce_result(result, time.monotonic() - started)
     save_json(args.output, result)
     return 0 if result["code"] == 0 else 1
 

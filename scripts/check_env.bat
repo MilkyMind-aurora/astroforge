@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # AstroForge 环境体检脚本（Windows）
+rem MF3: banner via star_console; silently skipped when python is missing
 @echo off
+python "%~dp0..\modules\_shared\star_console.py" banner check_env "env check" 2>nul
 echo === AstroForge env check (Windows) ===
 python --version
 where conda || echo [MISS] conda

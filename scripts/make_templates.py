@@ -4,6 +4,7 @@
 每套按方案规范设置正文/标题字体（中英文分开）、行距、页边距与签名特性；
 模板只承载样式（无正文内容），md2docx 转换时作为基底文档继承。
 用法：python scripts/make_templates.py [--output templates]
+星幕输出（MF3）：经 modules/_shared/star_console（TTY 富文本/管道纯文本）。
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
+from star_console import banner, log  # noqa: E402
 
 
 def _set_font(style, ascii_font: str, east_font: str, size_pt: float,
@@ -150,6 +153,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="生成 5 套内置 DOCX 模板")
     parser.add_argument("--output", default=str(REPO_ROOT / "templates"))
     args = parser.parse_args()
+    banner("make_templates", "内置 DOCX 模板生成 · 5 套")
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     for key, builder in BUILDERS.items():
@@ -158,8 +162,8 @@ def main() -> int:
         # 生成即验：能重新打开且关键样式存在
         reopened = Document(str(target))
         assert "Heading 1" in [s.name for s in reopened.styles]
-        print(f"[OK] {target.name}")
-    print(f"完成：{len(BUILDERS)} 套模板已生成到 {output}")
+        log(None, f"[OK] {target.name}")
+    log(None, f"完成：{len(BUILDERS)} 套模板已生成到 {output}")
     return 0
 
 

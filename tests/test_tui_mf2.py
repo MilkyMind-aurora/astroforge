@@ -205,7 +205,6 @@ def anyio_backend() -> str:
 @pytest.mark.anyio
 async def test_时间线_空起步重建与失败态联动() -> None:
     from textual.app import App, ComposeResult
-
     from tui.components.timeline import StepTimeline
 
     class Host(App):

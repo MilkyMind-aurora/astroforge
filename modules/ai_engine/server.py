@@ -3,6 +3,8 @@
 与 Sidereal Core（8420）进程隔离：模型 OOM/崩溃不拖垮服务核心，
 由服务核心 watcher 看护自动重启（≤restart_limit 次）。
 模型常驻/闲置 5 分钟卸载/2B↔9B 热切换的完整版属 Phase 6.1。
+星幕输出（MF3）：横幅与 [INFO] 日志经 modules/_shared/star_console（TTY 态富文本，
+管道态纯文本；[INFO]/[ERROR] 前缀字节不变）。
 """
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -17,6 +20,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
+from star_console import banner, log  # noqa: E402
 
 app = FastAPI(title="AstroForge AI Engine", version="0.1.0")
 
@@ -49,7 +55,7 @@ async def _start_idle_watcher() -> None:
                 with _lock:
                     _state["model"] = None
                     _state["model_key"] = None
-                print(f"[INFO] 模型闲置超过 {IDLE_TIMEOUT}s，已自动卸载释放内存", flush=True)
+                log("INFO", f"模型闲置超过 {IDLE_TIMEOUT}s，已自动卸载释放内存")
     asyncio.create_task(_watch())
 
 
@@ -121,6 +127,7 @@ async def switch_model(body: ModelBody):
         _state["model"] = _load_model(body.model_key)
         _state["model_key"] = body.model_key
         _state["last_used"] = time.time()  # 重置闲置计时
+    log("INFO", f"模型加载完成: {body.model_key}")
     return {"ok": True, "current_model": body.model_key}
 
 
@@ -157,6 +164,7 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8421)
     args = parser.parse_args()
+    banner("ai_engine", f"env_ai · {args.host}:{args.port}")
     import uvicorn
 
     uvicorn.run(app, host=args.host, port=args.port, workers=1)

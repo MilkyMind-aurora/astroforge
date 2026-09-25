@@ -1,16 +1,19 @@
 """转换层（入）：anydoc 办公文档转 MD CLI——Rust 二进制包装（方案 3.4.1）。
 
 二进制预检（补丁 3）：缺失时返回 4004 + 修复指引，绝不裸崩 FileNotFoundError。
+星幕输出（MF3）：横幅/阶段/进度/收尾卡经 cli_utils→star_console；[INFO]/[ERROR]
+前缀与结果 JSON 契约字节不变。
 """
 from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
-from cli_utils import error, fail, info, load_json, ok, save_json
+from cli_utils import announce_result, banner, error, fail, info, load_json, ok, progress, save_json, stage
 
 SUPPORTED_SUFFIXES = {".doc", ".docx", ".docm", ".ppt", ".pptx", ".xls", ".xlsx", ".xlsm",
                       ".odt", ".ods", ".odp", ".rtf", ".epub", ".csv"}
@@ -48,7 +51,8 @@ def run_anydoc(cfg: dict) -> dict:
         return fail(4001, "未找到可转换的办公文档")
 
     converted, failed = [], []
-    for target in targets:
+    stage("Office → Markdown")
+    for index, target in enumerate(targets, start=1):
         # anydoc 真实 CLI：anydoc <input> -o <out.md>（每文件一个 Markdown 输出）
         out_md = output_dir / f"{target.stem}.md"
         completed = subprocess.run(
@@ -58,6 +62,7 @@ def run_anydoc(cfg: dict) -> dict:
         if completed.returncode == 0 and out_md.exists():
             converted.append(str(out_md))
             info(f"转换成功: {target.name} → {out_md.name}")
+            progress(index, len(targets), "转换进度")  # TTY 态进度条；非 TTY 静默
         else:
             failed.append({"file": str(target), "stderr": completed.stderr[-300:]})
             error(f"转换失败: {target.name}")
@@ -66,16 +71,18 @@ def run_anydoc(cfg: dict) -> dict:
 
 
 def main() -> int:
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description="AstroForge anydoc 转换模块")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     cfg = load_json(args.config)
+    banner("anydoc", "env_anydoc")
     try:
         result = run_anydoc(cfg)
-    except Exception as exc:
-        error(f"执行异常: {exc}")
+    except Exception as exc:  # [ERROR] 行由收尾卡统一发，此处只归档结果契约
         result = fail(3003, f"模块执行异常: {exc}")
+    announce_result(result, time.monotonic() - started)
     save_json(args.output, result)
     return 0 if result["code"] == 0 else 1
 

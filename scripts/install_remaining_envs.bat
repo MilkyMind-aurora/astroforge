@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # AstroForge Windows conda 环境补全脚本（Phase 0 Task 0.1.x）
+rem MF3: banner via star_console; silently skipped when python is missing
 @echo off
+python "%~dp0..\modules\_shared\star_console.py" banner install_remaining_envs "conda envs setup" 2>nul
 echo === AstroForge install remaining envs (Windows) ===
 
 conda env list | findstr env_astroforge >nul

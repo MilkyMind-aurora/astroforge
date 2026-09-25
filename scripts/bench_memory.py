@@ -9,14 +9,20 @@
 
 红线：单任务峰值 ≤ 12GB（settings.system.max_memory_gb）。
 安全约定：本脚本只读进程指标（psutil），不启动任何子进程。
+星幕输出（MF3）：经 modules/_shared/star_console（TTY 富文本/管道纯文本）。
 """
 from __future__ import annotations
 
 import argparse
 import sys
 import time
+from pathlib import Path
 
 import psutil
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
+from star_console import STAR_ICONS, banner, log, result_card  # noqa: E402
 
 LIMIT_GB = 12.0
 POLL_SECONDS = 0.5
@@ -45,6 +51,7 @@ def main() -> int:
     parser.add_argument("--label", default="被测进程")
     parser.add_argument("--budget-gb", type=float, default=LIMIT_GB)
     args = parser.parse_args()
+    banner("bench_memory", "内存峰值基准 · 子进程树 RSS 采样")
 
     if args.pid is None and args.find:
         # 自动发现：匹配 cmdline 子串的进程集合（Windows PID，规避 MSYS 差异）
@@ -61,39 +68,45 @@ def main() -> int:
             time.sleep(1)
             pids = _matched()
         if not pids:
-            print(f"[MISS] 30s 内未发现 cmdline 含 '{args.find}' 的进程")
+            log(None, f"[MISS] 30s 内未发现 cmdline 含 '{args.find}' 的进程")
             return 2
-        print(f"[观测] 发现进程: {pids}")
+        log(None, f"[观测] 发现进程: {pids}")
         peak, start = 0.0, time.time()
         while pids:
             peak = max(peak, *(tree_rss_gb(p) for p in pids))
             time.sleep(POLL_SECONDS)
             pids = [p for p in pids if psutil.pid_exists(p)] or _matched()
         elapsed = time.time() - start
-        verdict = "✅ 达标" if peak <= args.budget_gb else "❌ 超红线"
-        print(f"[结果] {args.label}: 峰值 {peak:.2f}GB，"
-              f"预算 {args.budget_gb}GB {verdict}，耗时 {elapsed:.0f}s")
+        _verdict(args.label, peak, args.budget_gb, elapsed)
         return 0 if peak <= args.budget_gb else 1
 
     if args.pid is None:
-        print("[MISS] 需要 --pid 或 --find")
+        log(None, "[MISS] 需要 --pid 或 --find")
         return 2
 
     try:
         psutil.Process(args.pid)
     except psutil.Error:
-        print(f"[MISS] 进程 {args.pid} 不存在")
+        log(None, f"[MISS] 进程 {args.pid} 不存在")
         return 2
 
-    print(f"[观测] {args.label} (pid={args.pid})，红线 {args.budget_gb}GB，每 {POLL_SECONDS}s 采样…")
+    log(None, f"[观测] {args.label} (pid={args.pid})，红线 {args.budget_gb}GB，每 {POLL_SECONDS}s 采样…")
     peak, start = 0.0, time.time()
     while psutil.pid_exists(args.pid):
         peak = max(peak, tree_rss_gb(args.pid))
         time.sleep(POLL_SECONDS)
     elapsed = time.time() - start
-    verdict = "✅ 达标" if peak <= args.budget_gb else "❌ 超红线"
-    print(f"[结果] {args.label}: 峰值 {peak:.2f}GB / 预算 {args.budget_gb}GB {verdict}，耗时 {elapsed:.0f}s")
+    _verdict(args.label, peak, args.budget_gb, elapsed)
     return 0 if peak <= args.budget_gb else 1
+
+
+def _verdict(label: str, peak: float, budget_gb: float, elapsed: float) -> None:
+    """收尾结果卡（verdict 星符取 icons.yaml 语义名，禁裸星符）。"""
+    ok_mark = peak <= budget_gb
+    verdict = f"{STAR_ICONS['task.success']} 达标" if ok_mark else f"{STAR_ICONS['status.error']} 超红线"
+    result_card("内存峰值基准" + ("达标" if ok_mark else "超红线"),
+                items=[(label, f"峰值 {peak:.2f}GB / 预算 {budget_gb}GB {verdict}")],
+                note=f"耗时 {elapsed:.0f}s", section="被测进程")
 
 
 if __name__ == "__main__":

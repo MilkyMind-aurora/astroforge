@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # AstroForge 数据库每日备份脚本（Windows 任务计划）
+rem MF3: banner via star_console; silently skipped when python is missing
 @echo off
 rem 用法：计划任务每日执行；密码走环境变量，不落明文
+python "%~dp0..\modules\_shared\star_console.py" banner db_backup "PostgreSQL daily backup" 2>nul
 if not defined ASTROFORGE_PG_PASSWORD (
     echo [MISS] ASTROFORGE_PG_PASSWORD not set & exit /b 1
 )

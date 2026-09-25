@@ -14,8 +14,9 @@
   tui/tui/theme/generated/tokens.py     Python 常量 + css_variables() + 星符表
   app/lib/core/design/tokens.g.dart     AstroPalette / lerpPalette / AstroTheme 工厂
                                         （替代 app/lib/core/theme.dart，禁 fromSeed）
-  modules/_shared/star_console.py       顶部「星空设计 token」生成段（渲染器四件套
-                                        是 V1-B.4/MF3 的活，本脚本只管样式段）
+  modules/_shared/star_console.py       顶部「星空设计 token」生成段（色板/银河/星符/
+                                        CLI 动效节流；渲染器六件套为手写区，随仓库
+                                        提交，本脚本只替换标记段不触及）
   config/design/starfield/seed.json     星野种子（60~90 颗确定性坐标，三端同源）
 
 用法：
@@ -39,6 +40,8 @@ from typing import Any
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
+from star_console import banner, log  # noqa: E402  # 星幕输出（MF3）：TTY 富文本/管道纯文本
 
 DEFAULT_THEME = "deep-space"        # §2.2：deep-space 为内置夜主题（默认）
 DEFAULT_STAR_SEED = 20260925        # 提交进仓库的星野种子（确定性基线）
@@ -58,11 +61,12 @@ STAR_CONSOLE_END = "# ==== END 星空设计 token ===="
 STAR_CONSOLE_PREAMBLE = '''# -*- coding: utf-8 -*-
 """CLI 星幕渲染器（方案 §2.5 / §四）。
 
-顶部「星空设计 token」段由 scripts/gen_design.py 生成（禁手改）；渲染器四件套
-（banner/stage/progress/result_card/error_card/log）于 V1-B.4/MF3 落地，届时
-颜色与星符一律取自生成段（运行时也可直读 config/design/tokens.yaml）。
-降级纪律【硬性】：非 TTY 或 rich 不可导入 → 全部回退纯文本；stdout 日志行
-（``[INFO] ``/``[ERROR] `` 前缀）与结果 JSON 契约字节不变（服务核心逐行捕获零改动）。
+顶部「星空设计 token」段由 scripts/gen_design.py 生成（禁手改）；标记段之后的
+渲染器手写区（banner/stage/progress/result_card/error_card/log 六件 + 错误码→
+修复指引映射）随仓库提交，段替换不触及（tests/test_gen_design 有保留断言）。
+降级纪律【硬性】：sys.stdout.isatty() 与 rich 可导入双检测，任一不满足 →
+全部回退纯文本；stdout 日志行（``[INFO] ``/``[ERROR] `` 前缀）与结果 JSON
+契约字节不变（服务核心逐行捕获零改动）。
 """
 from __future__ import annotations
 
@@ -76,6 +80,9 @@ def palette(mode: str = "dark") -> dict[str, str]:
         return dict(STAR_TOKENS[mode])
     except KeyError:
         raise ValueError(f"未知色彩档: {mode}（可选: dark/light）") from None
+
+# 渲染器（banner/stage/progress/result_card/error_card/log 六件套 + 错误码→修复
+# 指引映射）为本文件手写区，随仓库提交；生成段替换只动上方标记内，不触及本区。
 '''
 
 # 生成物必须存在的 token 键（缺键=契约破坏，gen 直接报错而非产出残缺三端）
@@ -216,6 +223,11 @@ def validate_bundle(bundle: dict[str, Any]) -> None:
             node = (node or {}).get(part) if isinstance(node, dict) else None
         if not isinstance(node, dict):
             errors.append(f"tokens.yaml: 缺 motion.{path}")
+    # CLI 动效节流（§1.4：进度条 100ms / spinner 80ms）——star_console 生成段消费
+    for key in ("progress_throttle_ms", "spinner_frame_ms"):
+        value = (motion.get("cli") or {}).get(key)
+        if not isinstance(value, int) or value <= 0:
+            errors.append(f"tokens.yaml: motion.cli.{key} 必须是正整数：{value!r}")
 
     tui = tokens.get("tui") or {}
     border_levels = tui.get("border_levels") or {}
@@ -947,7 +959,7 @@ def render_star_console_segment(light: dict[str, str], dark: dict[str, str],
     lines = [
         STAR_CONSOLE_BEGIN,
         f"# 源：config/design/tokens.yaml + icons.yaml（sha256:{sha}）",
-        "# 消费：CLI 全部颜色/星符一律取自本段（裸色/裸星符=违反设计契约）；",
+        "# 消费：CLI 全部颜色/星符/动效节流一律取自本段（裸色/裸星符=违反设计契约）；",
         "#       富文本色用 STAR_TOKENS，纯文本降级路径不取色（字节契约不变）。",
         "STAR_TOKENS: dict[str, dict[str, str]] = {",
     ]
@@ -960,6 +972,10 @@ def render_star_console_segment(light: dict[str, str], dark: dict[str, str],
         "STAR_GALAXY: dict[str, list[str]] = {",
         f'    "dark": {_py(galaxy["stops"])},',
         f'    "light": {_py(galaxy["stopsLight"])},',
+        "}",
+        "STAR_MOTION: dict[str, int] = {",
+        f"    {_py('progress_throttle_ms')}: {_py(tokens['motion']['cli']['progress_throttle_ms'])},",
+        f"    {_py('spinner_frame_ms')}: {_py(tokens['motion']['cli']['spinner_frame_ms'])},",
         "}",
         "STAR_ICONS: dict[str, str] = {",
     ]
@@ -1075,6 +1091,7 @@ def main(argv: list[str] | None = None) -> int:
         help=f"星野种子（默认 {DEFAULT_STAR_SEED}；种子决定 60~90 颗星点的确定性坐标）",
     )
     args = parser.parse_args(argv)
+    banner("gen_design", "设计契约渲染器 · config/design → TUI/Flutter/CLI 产物")
 
     try:
         bundle = load_bundle(REPO_ROOT)
@@ -1087,9 +1104,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for rel in ARTIFACTS:
         mark = "写入" if written.get(rel) else "未变"
-        print(f"[gen_design] {mark}  {rel}")
-    print(f"[gen_design] 主题包: {themes}（默认 {DEFAULT_THEME}）")
-    print("[gen_design] 纪律：tokens.yaml 任一变更必须重跑本脚本（CI diff=0 门禁）")
+        log(None, f"[gen_design] {mark}  {rel}")
+    log(None, f"[gen_design] 主题包: {themes}（默认 {DEFAULT_THEME}）")
+    log(None, "[gen_design] 纪律：tokens.yaml 任一变更必须重跑本脚本（CI diff=0 门禁）")
     return 0
 
 

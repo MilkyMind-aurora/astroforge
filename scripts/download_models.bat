@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # AstroForge model download guide (no real download; print commands for user)
 # Primary model: empero-ai/Qwen3.8-2B-Distill-GGUF (HuggingFace, use hf-mirror in CN)
+rem MF3: banner via star_console; silently skipped when python is missing
 @echo off
+python "%~dp0..\modules\_shared\star_console.py" banner download_models "GGUF model download guide" 2>nul
 echo === AstroForge model download guide ===
 echo Option A (hf-mirror direct, recommended in CN):
 echo   curl -L -o models\Qwen3.8-2B-Q4_K_M.gguf https://hf-mirror.com/empero-ai/Qwen3.8-2B-Distill-GGUF/resolve/main/Qwen3.8-2B-Q4_K_M.gguf

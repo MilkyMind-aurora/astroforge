@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # AstroForge 数据库每日备份脚本（macOS/Linux cron）
 # 凭据经临时 pgpass 文件注入（权限 600），脚本内不出现明文口令
+# 星幕输出（MF3）：横幅经 star_console；python 缺失时静默跳过（set -e 下必须 || true）
 set -e
+python3 "$(dirname "$0")/../modules/_shared/star_console.py" banner db_backup "PostgreSQL daily backup" 2>/dev/null || true
 [ -n "$ASTROFORGE_PG_PASSWORD" ] || { echo "[MISS] ASTROFORGE_PG_PASSWORD not set"; exit 1; }
 BACKUP_DIR="$(dirname "$0")/../data/backups"
 mkdir -p "$BACKUP_DIR"

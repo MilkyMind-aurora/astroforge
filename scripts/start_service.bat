@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # AstroForge 服务核心启动脚本（Windows）
 # 前台启动 Sidereal Core（127.0.0.1:8420）；守护模式请用 pythonw -m astroforge serve
+rem MF3: banner via star_console (replaces the old slogan echo lines)
 @echo off
-echo AstroForge - Forging Order from Stellar Chaos.
-echo Sidereal Core v0.1.0 starting...
+python "%~dp0..\modules\_shared\star_console.py" banner start_service "Sidereal Core v0.1.0 starting - Forging Order from Stellar Chaos." 2>nul
 
 where conda >nul 2>nul
 if %errorlevel%==0 (

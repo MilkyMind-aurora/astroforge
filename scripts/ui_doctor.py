@@ -42,6 +42,8 @@ from pathlib import Path
 from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
+from star_console import banner, log, result_card  # noqa: E402  # 星幕输出（MF3 §4.1）：TTY 富文本/管道纯文本
 
 GEN_DIR = REPO_ROOT / "tui" / "tui" / "theme" / "generated"  # 裸色豁免目录（tokens 生成物）
 HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
@@ -261,18 +263,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.list:
         for name, desc, _fn in CHECKS:
             flag = "（--full）" if name in FULL_ONLY else ("（--quick 跳过）" if name in QUICK_SKIP else "")
-            print(f"  {name:<16} {desc}{flag}")
+            log(None, f"  {name:<16} {desc}{flag}")
         return 0
 
     if args.quick and args.full:
-        print("[ui_doctor] 参数冲突：--quick（契约快检）与 --full（全量含 flutter）互斥")
+        log(None, "[ui_doctor] 参数冲突：--quick（契约快检）与 --full（全量含 flutter）互斥")
         return 2
 
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
     known = {name for name, _d, _f in CHECKS}
     unknown = sorted(skip - known)
     if unknown:
-        print(f"[ui_doctor] 未知检查项: {unknown}（可选: {', '.join(sorted(known))}）")
+        log(None, f"[ui_doctor] 未知检查项: {unknown}（可选: {', '.join(sorted(known))}）")
         return 2
 
     # scripts/ 目录入 import 路径（gen-idempotent 需要复用 gen_design 的产物清单）
@@ -283,18 +285,17 @@ def main(argv: list[str] | None = None) -> int:
         (name, desc, fn) for name, desc, fn in CHECKS if name not in FULL_ONLY or args.full
     ]
     mode = "契约快检" if args.quick else ("全量（含 flutter）" if args.full else "默认集")
-    print(f"ui_doctor · 前端聚合验收（{mode}，{len(selected)} 项；repo={REPO_ROOT}）")
-    print("-" * 72)
+    banner("ui_doctor", f"前端聚合验收 · {mode} · {len(selected)} 项 · repo={REPO_ROOT}")
 
     results: list[tuple[str, str, str]] = []  # (name, mark, note)
     for name, desc, fn in selected:
         if name in skip:
             results.append((name, "SKIP", "--skip 显式跳过"))
-            print(f"[SKIP] {name:<16} --skip 显式跳过")
+            log(None, f"[SKIP] {name:<16} --skip 显式跳过")
             continue
         if name in quick_skip:
             results.append((name, "SKIP", quick_skip[name]))
-            print(f"[SKIP] {name:<16} {quick_skip[name]}")
+            log(None, f"[SKIP] {name:<16} {quick_skip[name]}")
             continue
         try:
             ok, note = fn()
@@ -302,14 +303,16 @@ def main(argv: list[str] | None = None) -> int:
             ok, note = False, f"检查器异常: {exc}"
         mark = "PASS" if ok else ("SKIP" if ok is None else "FAIL")
         results.append((name, mark, note))
-        print(f"[{mark}] {name:<16} {note}")
+        log(None, f"[{mark}] {name:<16} {note}")
 
-    print("-" * 72)
     n_pass = sum(1 for _n, m, _t in results if m == "PASS")
     n_fail = sum(1 for _n, m, _t in results if m == "FAIL")
     n_skip = sum(1 for _n, m, _t in results if m == "SKIP")
     verdict = "全绿" if n_fail == 0 else "存在 FAIL"
-    print(f"结论: {verdict}（PASS {n_pass} / FAIL {n_fail} / SKIP {n_skip}）")
+    rows = [(f"{mark} {name}", note) for name, mark, note in results]
+    result_card(f"聚合验收{verdict}",
+                items=rows, note=f"PASS {n_pass} / FAIL {n_fail} / SKIP {n_skip}",
+                section="检查项")
     return 0 if n_fail == 0 else 1
 
 

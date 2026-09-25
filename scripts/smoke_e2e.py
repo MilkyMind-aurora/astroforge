@@ -3,7 +3,7 @@
 
 前置：服务核心已启动（scripts/start_service.bat|.sh）；ASTROFORGE_PG_PASSWORD 已设置。
 用法：python scripts/smoke_e2e.py [--port 8420] [--skip-ai]
-输出：PASS/FAIL/SKIP 矩阵；任一 FAIL 退出码 1。
+输出：PASS/FAIL/SKIP 矩阵（MF3 起经 star_console 星幕输出）；任一 FAIL 退出码 1。
 安全约定：仅允许对本机回环地址的 Sidereal Core 发起请求（显式校验，非限定）。
 """
 from __future__ import annotations
@@ -16,6 +16,9 @@ from pathlib import Path
 import httpx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
+from star_console import banner, log, result_card  # noqa: E402
+
 ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 RESULTS: list[tuple[str, str, str]] = []  # (用例, 结果, 备注)
@@ -30,7 +33,17 @@ def _check_base(host: str) -> None:
 def _record(name: str, ok: bool | None, note: str = "") -> None:
     mark = "SKIP" if ok is None else ("PASS" if ok else "FAIL")
     RESULTS.append((name, mark, note))
-    print(f"[{mark}] {name}  {note}")
+    log(None, f"[{mark}] {name}  {note}")  # 字节契约同旧 print；TTY 态走星幕样式
+
+
+def _summary() -> None:
+    passed = sum(1 for _, m, _ in RESULTS if m == "PASS")
+    failed = sum(1 for _, m, _ in RESULTS if m == "FAIL")
+    skipped = sum(1 for _, m, _ in RESULTS if m == "SKIP")
+    rows = [(f"{mark} {name}", note) for name, mark, note in RESULTS]
+    result_card("端到端冒烟矩阵" + ("全绿" if failed == 0 else "存在失败"),
+                items=rows, note=f"{passed} PASS / {failed} FAIL / {skipped} SKIP",
+                section="用例")
 
 
 def main() -> int:
@@ -41,6 +54,7 @@ def main() -> int:
     parser.add_argument("--wait-seconds", type=int, default=90, help="任务完成轮询上限")
     args = parser.parse_args()
     _check_base(args.host)
+    banner("smoke_e2e", f"端到端冒烟矩阵 · http://{args.host}:{args.port}")
     token = (REPO_ROOT / "data" / "service_token").read_text(encoding="utf-8").strip()
     headers = {"X-AstroForge-Token": token}
     client = httpx.Client(
@@ -139,18 +153,9 @@ def main() -> int:
             except Exception as exc:
                 _record("AI 指令链路", False, str(exc))
 
-    passed = sum(1 for _, m, _ in RESULTS if m == "PASS")
     failed = sum(1 for _, m, _ in RESULTS if m == "FAIL")
-    skipped = sum(1 for _, m, _ in RESULTS if m == "SKIP")
-    print(f"\n矩阵结果: {passed} PASS / {failed} FAIL / {skipped} SKIP")
+    _summary()
     return 1 if failed else 0
-
-
-def _summary() -> None:
-    passed = sum(1 for _, m, _ in RESULTS if m == "PASS")
-    failed = sum(1 for _, m, _ in RESULTS if m == "FAIL")
-    skipped = sum(1 for _, m, _ in RESULTS if m == "SKIP")
-    print(f"\n矩阵结果: {passed} PASS / {failed} FAIL / {skipped} SKIP")
 
 
 if __name__ == "__main__":

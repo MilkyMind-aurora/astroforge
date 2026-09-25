@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # AstroForge macOS conda/venv 环境补全脚本（Phase 10）
+# 星幕输出（MF3）：横幅经 star_console；python 缺失时静默跳过（set -e 下必须 || true）
 set -e
+python3 "$(dirname "$0")/../modules/_shared/star_console.py" banner install_envs_macos "conda/venv envs setup" 2>/dev/null || true
 echo "=== AstroForge install envs (macOS) ==="
 
 if command -v conda >/dev/null 2>&1; then

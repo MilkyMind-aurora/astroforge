@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # AstroForge anydoc 构建脚本（Windows，需 Rust 工具链）
+rem MF3: banner via star_console; silently skipped when python is missing
 @echo off
+python "%~dp0..\modules\_shared\star_console.py" banner install_anydoc "build anydoc (Rust)" 2>nul
 echo === AstroForge build anydoc (Rust) ===
 where cargo >nul 2>nul || (echo [MISS] cargo - install from https://rustup.rs & exit /b 1)
 if not exist "%~dp0..\modules\anydoc\bin" mkdir "%~dp0..\modules\anydoc\bin"

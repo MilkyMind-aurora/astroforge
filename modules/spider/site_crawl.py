@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import urldefrag, urljoin, urlparse
 
 import sidebar_parser
-from cli_utils import fail, info, ok
+from cli_utils import error, fail, info, ok, progress
 from url_guard import UrlGuardError
 
 PAGE_LINK_RE = re.compile(r'href="([^"#]+)"')
@@ -185,11 +185,12 @@ def _crawl_structured(url: str, entry_html: str, output_dir: Path,
             failed_state.pop(target, None)
             _save_state(output_dir, completed, failed_state)
             info(f"[{index}/{total}] {target}")
+            progress(index, total, "爬取进度")  # TTY 态进度条；非 TTY 静默（[INFO] 行即进度）
         except Exception as exc:
             failed.append({"url": target, "chapter": chapter, "error": str(exc)})
             failed_state[target] = str(exc)
             _save_state(output_dir, completed, failed_state)
-            print(f"[ERROR] {target}: {exc}", flush=True)
+            error(f"{target}: {exc}")  # 字节契约同旧裸 print（[ERROR] 前缀）
         time.sleep(max(0.0, interval))
 
     # _index.json：完整侧边栏结构 + 页面清单 + 失败清单
@@ -248,6 +249,7 @@ def _crawl_bfs(url: str, output_dir: Path, max_pages: int, interval: float,
             failed_state.pop(current, None)
             _save_state(output_dir, completed, failed_state)
             info(f"[{len(pages)}/{max_pages}] {current}")
+            progress(len(pages), max_pages, "爬取进度")
             for href in PAGE_LINK_RE.findall(html):
                 absolute = urljoin(current, href)
                 parsed = urlparse(absolute)
@@ -258,7 +260,7 @@ def _crawl_bfs(url: str, output_dir: Path, max_pages: int, interval: float,
             failed.append({"url": current, "error": str(exc)})
             failed_state[current] = str(exc)
             _save_state(output_dir, completed, failed_state)
-            print(f"[ERROR] {current}: {exc}", flush=True)
+            error(f"{current}: {exc}")  # 字节契约同旧裸 print（[ERROR] 前缀）
         time.sleep(max(0.0, interval))
 
     data: dict = {"pages": pages, "failed": failed, "count": len(pages), "mode": "bfs"}

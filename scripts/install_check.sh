@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # AstroForge macOS 一键体检（开源用户自装依赖清单，Phase 10.2.4）
+# 星幕输出（MF3）：横幅经 star_console；python 缺失时静默跳过
+python3 "$(dirname "$0")/../modules/_shared/star_console.py" banner install_check "macOS deps checklist" 2>/dev/null || true
 echo "=== AstroForge macOS install check ==="
 
 command -v brew >/dev/null && echo "[OK] Homebrew" || echo "[MISS] Homebrew -> https://brew.sh"

@@ -2,6 +2,8 @@
 
 约定：python cli.py --config <config.json> --output <result.json>
 config: {"task_type": "mineru", "input_path": "<PDF/图片/目录>", "output_dir": "..."}
+星幕输出（MF3）：横幅/阶段/收尾卡经 cli_utils→star_console；[INFO]/[ERROR] 前缀
+与结果 JSON 契约字节不变（服务核心逐行捕获零改动）。
 """
 from __future__ import annotations
 
@@ -10,10 +12,11 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
-from cli_utils import error, fail, info, load_json, ok, save_json
+from cli_utils import announce_result, banner, error, fail, info, load_json, ok, save_json, stage
 
 TIMEOUT_SECONDS = 3600
 
@@ -38,6 +41,7 @@ def run_mineru(cfg: dict) -> dict:
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         env.setdefault(var, threads)
 
+    stage("MinerU 文档解析")
     info(f"MinerU 解析开始: {input_path}（线程上限 {threads}）")
     completed = subprocess.run(
         ["mineru", "-p", str(input_path), "-o", str(output_dir), "-b", "pipeline"],
@@ -53,18 +57,20 @@ def run_mineru(cfg: dict) -> dict:
 
 
 def main() -> int:
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description="AstroForge MinerU 解析模块")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     cfg = load_json(args.config)
+    banner("mineru", "env_mineru")
     try:
         result = run_mineru(cfg)
     except subprocess.TimeoutExpired:
         result = fail(3002, f"mineru 超时（>{TIMEOUT_SECONDS}s）")
-    except Exception as exc:
-        error(f"执行异常: {exc}")
+    except Exception as exc:  # [ERROR] 行由收尾卡统一发，此处只归档结果契约
         result = fail(3003, f"模块执行异常: {exc}")
+    announce_result(result, time.monotonic() - started)
     save_json(args.output, result)
     return 0 if result["code"] == 0 else 1
 

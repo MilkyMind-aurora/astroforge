@@ -6,16 +6,30 @@ config: {"task_type": "wpd", "input_dir": "<图表图片目录或单图 input_pa
          "output_dir": "...", "append_to_md": "<目标 md 可选>"}
 输出：每图一个同名 .csv（data_x,data_y）；append_to_md 提供时把各 CSV 以
 ```csv 代码块追加到该 Markdown 末尾（方案 3.3.2 步骤 4）。
+星幕输出（MF3）：横幅/阶段/进度/收尾卡经 cli_utils→star_console；[INFO]/[ERROR]
+前缀与结果 JSON 契约字节不变。
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
-from cli_utils import error, fail, info, load_json, ok, save_json  # noqa: E402
+from cli_utils import (  # noqa: E402
+    announce_result,
+    banner,
+    error,
+    fail,
+    info,
+    load_json,
+    ok,
+    progress,
+    save_json,
+    stage,
+)
 
 try:
     import chart_extractor  # 同目录核心算法（依赖 cv2/numpy）
@@ -63,9 +77,10 @@ def run_wpd(cfg: dict) -> dict:
     output_dir = Path(cfg.get("output_dir", (images[0].parent) / "wpd_out"))
     output_dir.mkdir(parents=True, exist_ok=True)
     axis = cfg.get("axis")
+    stage("图表数值提取")
 
     csv_pairs, skipped = [], []
-    for image_path in images:
+    for index, image_path in enumerate(images, start=1):
         try:
             result = chart_extractor.extract_curve(str(image_path), axis)
         except FileNotFoundError as exc:
@@ -80,6 +95,7 @@ def run_wpd(cfg: dict) -> dict:
         csv_pairs.append((image_path.name, csv_path))
         info(f"提取完成: {image_path.name} → {csv_path.name}"
              f"（{len(result['points'])} 点）")
+        progress(index, len(images), "提取进度")  # TTY 态进度条；非 TTY 静默
 
     if not csv_pairs:
         return fail(3003, "所有图表均无法提取（详见 skipped）",
@@ -99,16 +115,18 @@ def run_wpd(cfg: dict) -> dict:
 
 
 def main() -> int:
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description="AstroForge WPD 图表提数模块")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     cfg = load_json(args.config)
+    banner("wpd", "env_wpd")
     try:
         result = run_wpd(cfg)
-    except Exception as exc:
-        error(f"执行异常: {exc}")
+    except Exception as exc:  # [ERROR] 行由收尾卡统一发，此处只归档结果契约
         result = fail(3003, f"模块执行异常: {exc}")
+    announce_result(result, time.monotonic() - started)
     save_json(args.output, result)
     return 0 if result["code"] == 0 else 1
 
