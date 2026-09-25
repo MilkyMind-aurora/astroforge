@@ -97,7 +97,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (_error != null) {
-      return Center(child: Text('加载失败：$_error', style: const TextStyle(color: Colors.red)));
+      return Center(child: Text('加载失败：$_error', style: TextStyle(color: Theme.of(context).colorScheme.error)));
     }
     final summary = _summary;
     if (summary == null) return const Center(child: CircularProgressIndicator());

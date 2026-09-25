@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/design/tokens.g.dart';
+import '../../core/design/design.dart';
 import '../widgets/placeholder_page.dart';
 
 /// 监控看板（Phase 1.2）：实时 CPU/内存曲线。
@@ -71,6 +71,8 @@ class _MonitorPageState extends State<MonitorPage> {
 
   @override
   Widget build(BuildContext context) {
+    // MF4 接线：曲线系列色改走当前插值色板（原直取 AstroPalette.dark 不随主题过渡）
+    final palette = AstroPaletteScope.of(context);
     return PlaceholderPage(
       title: '监控看板',
       phase: 'Phase 1.2 · 9.5',
@@ -85,7 +87,7 @@ class _MonitorPageState extends State<MonitorPage> {
                 children: [
                   const Text('CPU %（演示流）'),
                   // 图表系列色取自设计契约生成物（禁手写色值）
-                  _chart(_cpuSpots, AstroPalette.dark.hydrogen, 'CPU'),
+                  _chart(_cpuSpots, palette.hydrogen, 'CPU'),
                 ],
               ),
             ),
@@ -98,7 +100,7 @@ class _MonitorPageState extends State<MonitorPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('内存 %（演示流）'),
-                  _chart(_memSpots, AstroPalette.dark.nebula, 'MEM'),
+                  _chart(_memSpots, palette.nebula, 'MEM'),
                 ],
               ),
             ),

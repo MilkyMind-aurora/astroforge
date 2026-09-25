@@ -54,7 +54,7 @@ class _PipelinePageState extends ConsumerState<PipelinePage> {
     } on ApiError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ [${e.code}] ${e.message}')),
+        SnackBar(content: Text('✕ [${e.code}] ${e.message}')),
       );
     }
   }
@@ -72,7 +72,7 @@ class _PipelinePageState extends ConsumerState<PipelinePage> {
     } on ApiError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ [${e.code}] ${e.message}')),
+        SnackBar(content: Text('✕ [${e.code}] ${e.message}')),
       );
     }
   }
@@ -81,7 +81,7 @@ class _PipelinePageState extends ConsumerState<PipelinePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (_error != null) {
-      return Center(child: Text('加载失败：$_error', style: const TextStyle(color: Colors.red)));
+      return Center(child: Text('加载失败：$_error', style: TextStyle(color: Theme.of(context).colorScheme.error)));
     }
     return ListView(
       padding: const EdgeInsets.all(24),

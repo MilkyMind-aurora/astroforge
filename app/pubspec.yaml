@@ -16,6 +16,11 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
+  # 线性图标（lucide，ISC 许可——方案 §1.6 Flutter 图标规则）
+  lucide_icons_flutter: ^3.1.20
+  # 星仔台词库 quotes.yaml 运行时解析（L1 数据插件，gen_design 镜像进 assets）
+  yaml: ^3.1.4
+
   # 状态管理 / 路由
   flutter_riverpod: 2.6.1
   go_router: ^18.0.0
@@ -41,3 +46,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # 设计契约运行时资产（scripts/gen_design.py 镜像，禁手改）
+  assets:
+    - assets/design/starfield/seed.json
+    - assets/design/quotes.yaml
+
+  # 星野 fragment shader（方案 §1.5 / 星空设计系统规格 §五：uTime/uSeed/uDensity 参数化）
+  shaders:
+    - shaders/starfield.frag

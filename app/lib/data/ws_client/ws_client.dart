@@ -12,6 +12,7 @@ enum WsStatus { connecting, connected, disconnected }
 
 /// 通用 WebSocket 客户端：指数退避重连（1s→60s 封顶）+ 45s 心跳超时。
 /// 消息信封：{"type","payload","ts"}，服务端 30s 心跳，45s 未收到即重连。
+/// 重连成功后由消费方 REST 全量刷新（pro §2.4：杜绝「僵尸状态」）。
 class ForgeWebSocket {
   ForgeWebSocket({required this.path});
 
@@ -24,31 +25,46 @@ class ForgeWebSocket {
   Timer? _heartbeatTimer;
   int _retryCount = 0;
   bool _disposed = false;
+  bool _connecting = false;
 
   ValueListenable<WsStatus> get status => _status;
   Stream<Map<String, dynamic>> get messages => _messages.stream;
 
-  void connect() {
-    if (_disposed) return;
+  /// 发送 JSON 消息（仅握手完成态；未连接静默丢弃，由调用方决定降级回执）。
+  void send(Map<String, dynamic> payload) {
+    final channel = _channel;
+    if (channel == null || _status.value != WsStatus.connected) return;
+    channel.sink.add(jsonEncode(payload));
+  }
+
+  Future<void> connect() async {
+    if (_disposed || _connecting) return;
+    _connecting = true;
     _status.value = WsStatus.connecting;
     final token = AppConfig.resolveToken() ?? '';
     final uri = Uri.parse(
       '${AppConfig.serviceBaseUrl.replaceAll('http', 'ws')}$path?token=$token',
     );
+    final channel = WebSocketChannel.connect(uri);
+    _channel = channel;
     try {
-      _channel = WebSocketChannel.connect(uri);
-      _channel!.stream.listen(
+      // 握手完成才置 connected（旧实现乐观置位，断连横幅会误判）
+      await channel.ready;
+      if (_disposed) return;
+      _status.value = WsStatus.connected;
+      _retryCount = 0;
+      _resetHeartbeat();
+      channel.stream.listen(
         _onData,
         onDone: _onDone,
         onError: (_) => _onDone(),
         cancelOnError: true,
       );
-      _status.value = WsStatus.connected;
-      _retryCount = 0;
-      _resetHeartbeat();
     } catch (e) {
       developer.log('WS connect failed: $e', name: 'ForgeWebSocket');
       _scheduleRetry();
+    } finally {
+      _connecting = false;
     }
   }
 
@@ -82,7 +98,7 @@ class ForgeWebSocket {
     final delay = Duration(seconds: (1 << _retryCount).clamp(1, 60));
     _retryCount++;
     _retryTimer?.cancel();
-    _retryTimer = Timer(delay, connect);
+    _retryTimer = Timer(delay, () => unawaited(connect()));
   }
 
   void dispose() {

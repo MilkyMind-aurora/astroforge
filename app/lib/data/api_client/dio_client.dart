@@ -130,6 +130,32 @@ class ApiClient {
   Future<void> resetToken() async {
     await _dio.post('/api/v1/service/token/reset');
   }
+
+  // ---- 星伴 AI（方案 §5.2/§5.6，MF4）----
+
+  /// 引擎状态探测（服务端只探测不拉起——watcher.probe_status）。
+  /// reachable=true 时随引擎 /v1/health 返回 current_model 等字段。
+  Future<Map<String, dynamic>> engineStatus() async {
+    final data = _unwrap(await _dio.get('/api/v1/ai/engine/status'));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  /// 模型热切换两档（服务端白名单：qwen2b / ornith9b），首载 9B 耗时较长。
+  Future<Map<String, dynamic>> switchModel(String modelKey) async {
+    final data = _unwrap(
+        await _dio.post('/api/v1/ai/model/switch', data: {'model_key': modelKey}));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
+  /// 指令对话（REST 一问一答；服务端在 instruction 命中时直接建任务并回
+  /// task_uuid——已实现 API 为准，客户端不做二次「确认创建」）。
+  Future<Map<String, dynamic>> aiChat(String message, {int? conversationId}) async {
+    final data = _unwrap(await _dio.post('/api/v1/ai/chat', data: {
+      'message': message,
+      'conversation_id': ?conversationId,
+    }));
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());

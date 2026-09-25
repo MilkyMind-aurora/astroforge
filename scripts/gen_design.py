@@ -18,6 +18,8 @@
                                         CLI 动效节流；渲染器六件套为手写区，随仓库
                                         提交，本脚本只替换标记段不触及）
   config/design/starfield/seed.json     星野种子（60~90 颗确定性坐标，三端同源）
+  app/assets/design/starfield/seed.json 同上（Flutter 运行时资产镜像，pubspec 声明）
+  app/assets/design/quotes.yaml         星仔台词库镜像（Flutter 运行时资产）
 
 用法：
   python scripts/gen_design.py             # 全量生成（星野用默认种子）
@@ -54,7 +56,14 @@ ARTIFACT_TPY = "tui/tui/theme/generated/tokens.py"
 ARTIFACT_DART = "app/lib/core/design/tokens.g.dart"
 ARTIFACT_CLI = "modules/_shared/star_console.py"
 ARTIFACT_SEED = "config/design/starfield/seed.json"
-ARTIFACTS = (ARTIFACT_TCSS, ARTIFACT_TPY, ARTIFACT_DART, ARTIFACT_CLI, ARTIFACT_SEED)
+# Flutter 运行时资产（pubspec 声明）：星野种子 + 台词库按字节镜像进 app/assets/，
+# 与 config/design 源同门禁（gen-idempotent diff=0），避免运行时拷贝漂移。
+ARTIFACT_APP_SEED = "app/assets/design/starfield/seed.json"
+ARTIFACT_APP_QUOTES = "app/assets/design/quotes.yaml"
+ARTIFACTS = (
+    ARTIFACT_TCSS, ARTIFACT_TPY, ARTIFACT_DART, ARTIFACT_CLI,
+    ARTIFACT_SEED, ARTIFACT_APP_SEED, ARTIFACT_APP_QUOTES,
+)
 
 STAR_CONSOLE_BEGIN = "# ==== BEGIN 星空设计 token（scripts/gen_design.py 生成，禁手改）===="
 STAR_CONSOLE_END = "# ==== END 星空设计 token ===="
@@ -1040,6 +1049,8 @@ def build_artifacts(repo_root: Path, star_seed: int = DEFAULT_STAR_SEED) -> dict
     cli_path = repo_root / ARTIFACT_CLI
     existing_cli = cli_path.read_text(encoding="utf-8") if cli_path.exists() else None
 
+    quotes_text = (repo_root / "config" / "design" / "quotes.yaml").read_text(encoding="utf-8")
+
     return {
         ARTIFACT_TCSS: render_tui_tcss(default_palette, tokens["tui"]["border_levels"], sha),
         ARTIFACT_TPY: render_tui_py(light, dark, theme_palettes, theme_modes, tokens, icons_flat, sha),
@@ -1049,6 +1060,8 @@ def build_artifacts(repo_root: Path, star_seed: int = DEFAULT_STAR_SEED) -> dict
             render_star_console_segment(light, dark, tokens, icons_flat, sha),
         ),
         ARTIFACT_SEED: seed_text,
+        ARTIFACT_APP_SEED: seed_text,
+        ARTIFACT_APP_QUOTES: quotes_text,
     }
 
 

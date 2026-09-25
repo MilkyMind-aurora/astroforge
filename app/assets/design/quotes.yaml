@@ -1,0 +1,111 @@
+# ============================================================
+# 星仔台词库 v1（AstroForge quotes.yaml）
+# 结构：事件组 → 多条候选 → 运行时随机
+# 硬约束：单条 ≤24 字（含标点，gen_design 校验断言）；禁网络烂梗；禁 emoji（品牌星符 ✦ ☄ 除外）；
+#         意象优先级：forge 锻造 > 恒星/氢到重元素 > 轨道 > 引力 > 星表
+# 消费端：tui/tui/ui/mascot.py（get_quote）+ Flutter MascotDirector
+# 覆盖：themes/<name>/quotes.yaml 可整组覆盖（L1 数据插件）
+# ============================================================
+version: 1
+lang: zh-CN
+
+sampling:
+  strategy: uniform            # 组内均匀随机
+  no_repeat_window: 3          # 同组最近 3 次抽样内不重复
+  midnight_override:           # 0-5 点时下列事件按概率改投 midnight 池
+    events: [boot, idle_long]
+    probability: 0.4
+
+dispatch:                      # 调度上限（台词气泡，非用户主动触发）
+  boot:          { cap_session: 1 }
+  first_task:    { cap_lifetime_once: true }   # 仅历史第 1 个任务
+  task_success:  { cooldown_s: 30 }
+  task_fail:     { cooldown_s: 10 }            # 连环失败 10s 只播 1 条
+  pipeline_complete: { cap_session: 5 }
+  idle_long:     { trigger_idle_min: 5, cooldown_min: 30, cap_day: 8 }
+  reconnect:     { cap_session: 3 }
+  meteor:        { cap_day: 8 }                # 配合流星彩蛋出现率
+  midnight:      { cap_session: 1 }
+  memory_clear:  { cooldown_s: 10 }
+  ai_fallback:   { cooldown_s: 60 }
+  global:        { bubble_hours_max: 4, bubble_duration_s: 2.5 }  # 主动气泡每小时 ≤4 条；任何输入立即收起
+
+events:
+  boot:
+    lines:
+      - "熔炉点火完毕，氢料就位，开锻。"
+      - "Sidereal Core 上线，恒星入主序带。"
+      - "星仔报到，锤已开刃，专治混沌。"
+      - "引力稳定，轨道清爽，好星象。"
+      - "今天也把一堆氢，锻成重元素。"
+
+  first_task:
+    lines:
+      - "第一炉开火，氢原子们排队进场。"
+      - "首锻出炉，星表从这颗记起。"
+      - "新轨道入轨成功，引擎已热身。"
+      - "第一单接下，从氢到恒星看我的。"
+
+  task_success:
+    lines:
+      - "锻造完成，杂质烧尽，出炉亮星。"
+      - "星表 +1，又是一颗干净文档恒星。"
+      - "聚变平稳，输出比输入亮。"
+      - "交付 ✦ 这批氢已炼成重元素。"
+      - "锤到星成，下一炉随时候着。"
+
+  task_fail:
+    lines:
+      - "熔炉打了个嗝，日志里找找谁捣乱。"
+      - "这颗氢没聚上，重试或查参数引力场。"
+      - "局部引力坍缩，坍缩点在日志末行。"
+      - "超新星也是恒星的一种活法，重试试。"
+      - "别慌，星图还稳，只是这一发偏了。"
+
+  pipeline_complete:
+    lines:
+      - "NovaFlow 全线贯通，星系级交付。"
+      - "流水线全通，重元素产线运转中。"
+      - "从氢到重元素，一气呵成。"
+      - "全链锻造完毕，星轨对齐无误。"
+
+  idle_long:
+    lines:
+      - "闲置也是蓄能，恒星不闪时在攒聚变。"
+      - "轨道很静，猎户座那边也一样。"
+      - "要不要喂我一点 PDF？"
+      - "守炉中，你随便逛。"
+      - "待机不是熄火，是白矮星模式。"
+
+  reconnect:
+    lines:
+      - "引力恢复，重新入轨，信号满格。"
+      - "刚穿过一片星云，现在回来了。"
+      - "重连成功，轨道参数已校准。"
+      - "视线重新锁定，导航星还在。"
+
+  meteor:
+    lines:
+      - "流星！许愿不如许个任务。"
+      - "划过的是流星，落下的是灵感。"
+      - "收到一颗流星，已记进星表。"
+
+  midnight:
+    lines:
+      - "凌晨的熔炉火最稳，但银河劝你休息。"
+      - "此刻的终端，和望远镜一样诚实。"
+      - "银河没有暂停键，但你有。"
+      - "夜越深星越亮，炉我先看着。"
+      - "检测到红移：睡眠正在远离你。"
+
+  memory_clear:
+    lines:
+      - "星尘已扫，炉膛干净，随时投料。"
+      - "忘掉的是缓存，留下的是星表。"
+      - "清理完成，白矮星看了都说干净。"
+      - "轨道留白，新的恒星有位置了。"
+
+  ai_fallback:                 # 【兼容保留】AI 降级兜底（承接旧库 fallback 组）
+    lines:
+      - "AI 打盹了，用肌肉记忆跑完了，参数请亲验。"
+      - "快捷模式兜底完成，细节请再过目。"
