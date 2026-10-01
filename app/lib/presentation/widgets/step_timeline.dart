@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/design/design.dart';
 import '../../data/api_client/dio_client.dart';
+import 'status_slide_text.dart';
+import 'stroke_checkmark.dart';
 
 /// 步骤时间线（星空设计系统规格 §三.5，流水线运行视图 + 任务详情共用）：
 /// 节点圆 20 / 连接线 2dp；pending=1.5dp stroke ink-400 空心；
@@ -191,11 +193,12 @@ class _NodeIcon extends StatefulWidget {
 
 class _NodeIconState extends State<_NodeIcon> with SingleTickerProviderStateMixin {
   late final AnimationController _pop = AnimationController(vsync: this);
+  int _successTick = 0; // #15：重进成功态时重播一笔画
 
   @override
   void didUpdateWidget(_NodeIcon oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 步骤完成瞬间：scale 过冲 1.08 → 回弹落定（#11 ζ0.6）
+    // 步骤完成瞬间：scale 过冲 1.08 → 回弹落定（#11 ζ0.6）+ 勾选一笔画重播
     if (oldWidget.status != 'success' && widget.status == 'success') {
       final stiffness = AstroMotion.springPop.stiffness;
       final spring = SpringDescription(
@@ -204,6 +207,7 @@ class _NodeIconState extends State<_NodeIcon> with SingleTickerProviderStateMixi
         damping: AstroMotion.springPop.damping * 2 * math.sqrt(stiffness),
       );
       _pop.animateWith(SpringSimulation(spring, 0, 1, 0));
+      setState(() => _successTick += 1);
     }
   }
 
@@ -225,9 +229,12 @@ class _NodeIconState extends State<_NodeIcon> with SingleTickerProviderStateMixi
           height: 20,
           decoration: BoxDecoration(color: palette.aurora, shape: BoxShape.circle),
           child: Center(
-            child: Text(
-              AstroIcons.taskSuccess,
-              style: TextStyle(fontSize: 11, color: palette.onAurora),
+            // #15 成功勾选一笔画：PathMetric 260ms 描画（reduced-motion 整段呈现）
+            child: StrokeCheckmark(
+              color: palette.onAurora,
+              size: 11,
+              strokeWidth: 1.8,
+              playKey: _successTick,
             ),
           ),
         );
@@ -356,9 +363,7 @@ class _StatusTag extends StatelessWidget {
       'canceled' => ('已取消', palette.ink400),
       _ => ('待运行', palette.ink400),
     };
-    return Text(
-      text,
-      style: TextStyle(fontSize: AstroType.caption.size, color: color),
-    );
+    // #14 状态文字推进：迁移时旧字下出、新字上进（AnimatedSwitcher 250ms）
+    return StatusSlideText(text: text, color: color);
   }
 }

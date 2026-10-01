@@ -127,6 +127,10 @@ python scripts\bench_memory.py --pid <PID> --label "MinerU 解析" --budget-gb 1
 # 重新生成 5 套 DOCX 模板
 python scripts\make_templates.py
 
+# 设计契约产物重渲染（tokens.yaml 变更后必须重跑，CI diff=0 门禁；
+# --seed 仅限本地预览——非默认种子的 seed.json 一经提交必挂该门禁）
+python scripts\gen_design.py
+
 # 打包（Windows：先 flutter build windows --release，再 Inno Setup 编译）
 iscc app\packaging\windows\astroforge.iss
 # macOS

@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/design/design.dart';
+import '../../core/eta/eta_estimator.dart';
 import '../../data/api_client/dio_client.dart';
 import '../../data/ws_client/ws_client.dart';
 import '../widgets/context_actions.dart';
+import '../widgets/progress_wash.dart';
 import '../widgets/undo_bar.dart';
 import 'history_detail.dart';
 
@@ -188,6 +190,15 @@ class _HistoryPageState extends ConsumerState<HistoryPage>
               'error_code': payload['error_code'],
           };
           final status = _tasks[i]['status'] as String?;
+          // #18 极光横幅：status 事件确认完成瞬间广播（uuid 去重在总线内）
+          if (type == 'status' && status == 'success') {
+            ref.read(taskCompletionsProvider.notifier).announce(
+                  taskUuid: uuid,
+                  title: _tasks[i]['title'] as String? ??
+                      _tasks[i]['task_type'] as String? ??
+                      '任务',
+                );
+          }
           if (status != null && _terminal.contains(status)) {
             _subs.remove(uuid)?.dispose(); // 终态关订阅
           }
@@ -353,7 +364,7 @@ class _EmptyGuide extends StatelessWidget {
         child: Column(
           children: [
             Text(AstroIcons.navHistory,
-                style: TextStyle(fontSize: 32, color: palette.ink400)),
+                style: TextStyle(fontSize: AstroType.display.size, color: palette.ink400)),
             const SizedBox(height: AstroSpace.gap),
             Text('星图暂无航迹 —— 还没有任务记录',
                 style: TextStyle(
@@ -421,10 +432,16 @@ class _TaskCard extends StatelessWidget {
         },
         closedBuilder: (context, open) => InkWell(
           onTap: open,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AstroSpace.card, vertical: 12),
-            child: _cardBody(context, palette, status, uuid),
+          child: ProgressWash(
+            // #10 进度底色前推：运行中任务卡底随真实 progress 填充
+            fraction: status == 'running'
+                ? ((task['progress'] as num?)?.toDouble() ?? 0) / 100
+                : 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AstroSpace.card, vertical: 12),
+              child: _cardBody(context, palette, status, uuid),
+            ),
           ),
         ),
         openBuilder: (context, _) => TaskDetailView(
@@ -443,6 +460,8 @@ class _TaskCard extends StatelessWidget {
     final duration = _durationText();
     final created = _relativeTime(task['created_at'] as String?);
     final stop = stopAt;
+    // M5 ETA：运行中且可估算时给出「剩余 ≈X」（长时档 >10s 才显示）
+    final etaText = _etaText();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -458,7 +477,7 @@ class _TaskCard extends StatelessWidget {
               ),
               child: Center(
                 child:
-                    Text(glyph, style: TextStyle(fontSize: 13, color: color)),
+                    Text(glyph, style: TextStyle(fontSize: AstroType.bodySm.size, color: color)),
               ),
             ),
             const SizedBox(width: AstroSpace.gapLg),
@@ -484,6 +503,7 @@ class _TaskCard extends StatelessWidget {
                       if (stop != null && stop.$2 > 0)
                         '停于步骤 ${stop.$1}/${stop.$2}',
                       if (duration != null) '耗时 $duration',
+                      if (etaText != null) '剩余 $etaText',
                       ?created,
                       if (task['error_code'] != null)
                         '错误 ${task['error_code']}',
@@ -499,11 +519,22 @@ class _TaskCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(AstroIcons.miscCaretRight,
-                style: TextStyle(fontSize: 12, color: palette.ink400)),
+                style: TextStyle(fontSize: AstroType.caption.size, color: palette.ink400)),
           ],
         ),
       ],
     );
+  }
+
+  /// 运行中任务的剩余时长文案（M5）：数据不足/瞬时档返回 null（禁伪造）。
+  String? _etaText() {
+    if (task['status'] != 'running') return null;
+    final eta = estimateTaskEta(
+      progress: (task['progress'] as num?)?.toInt() ?? 0,
+      startedAt: DateTime.tryParse(task['started_at'] as String? ?? ''),
+      now: DateTime.now(),
+    );
+    return shouldShowEta(eta) ? formatEta(eta!) : null;
   }
 
   String _short(String uuid) => uuid.length >= 8 ? uuid.substring(0, 8) : uuid;

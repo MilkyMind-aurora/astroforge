@@ -14,6 +14,7 @@ from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Button, Input, OptionList, Static, Switch
 from textual.widgets.option_list import Option
 
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.service_client import ServiceClient
 from tui.theme.generated import tokens as design
 from tui.ui.mascot import QUOTES
@@ -32,8 +33,10 @@ def quote_preview(event: str = "boot", limit: int = 3) -> str:
     return " ｜ ".join(lines[:limit]) or "（台词库为空）"
 
 
-class SettingsPage(VerticalScroll):
+class SettingsPage(VerticalScroll, EnvGateMixin):
     """设置页：外观组（主题热切+持久化）/ 星仔 / 服务阈值 / 摘要。"""
+
+    GATE_DISABLE = (".settings-group",)  # PG 缺失时分组只读（加载失败本就不建组）
 
     CSS = """
     #settings-body { color: $ink-900; margin-top: 1; }
@@ -57,6 +60,8 @@ class SettingsPage(VerticalScroll):
                      id="settings-body")
 
     def on_mount(self) -> None:
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self.run_worker(self.refresh_settings(), exclusive=True)
 
     async def refresh_settings(self) -> None:

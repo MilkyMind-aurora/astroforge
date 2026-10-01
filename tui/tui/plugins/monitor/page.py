@@ -4,13 +4,21 @@
 - KPI 行：CPU % / 内存 GB / 磁盘 MB/s / 运行任务数（等宽数字，1s WS 驱动，
   页面刷新节流 500ms）
 - Sparkline 曲线：Textual Sparkline，窗口 60 点（CPU=极光青 / 内存=氢蓝）
-- 进程表：本机 AstroForge 相关进程（PID/名称/环境/CPU/内存），运行行前置 ◈
+- 进程表：本机 AstroForge 相关进程（PID/名称/环境/CPU/内存），运行行前置
+  ◈/◉ 1s 有界交替帧（task.running/running_f2，set_interval 仅运行期间起表，
+  L15）
 - 告警区：内存阈值（>10GB 熔金 / >12GB nova，阈值取自 config-summary）+
-  WS 通道告警；有未处理告警时 aurora-wash 底（静态，终端禁呼吸动画）
-- 历史回放：range 胶囊 实时|1h|6h|24h（GET /monitor/history，整段重绘）
+  WS type=alert 实时事件（信封 {type:alert,payload:{level,source,message,
+  task_uuid?}}，L16；服务端广播由 server 组实现）；有未处理告警时 aurora-wash
+  底。规格 v1 §1.8 的 wash 呼吸在终端不落地——§3.7 红线「禁连续背景动画」，
+  TUI 取静态 wash（取舍如实注明，L15）。
+- 历史回放：range 胶囊（统一 ChipBar，L17）实时|1h|6h|24h（GET /monitor/history，
+  整段重绘）
+- 告警行 Enter：按 task_uuid 定位任务详情（无 uuid 回落切历史页，L16）
 
-数据契约：/ws/monitor（app 层 1s 采集入 MonitorState）+ /api/v1/monitor/history。
-进程表为本机 psutil 直采（服务核心无进程清单 API，TUI 与服务同机运行）。
+数据契约：/ws/monitor（app 层 1s 采集入 MonitorState + alert 事件入队）+
+/api/v1/monitor/history。进程表为本机 psutil 直采（服务核心无进程清单 API，
+TUI 与服务同机运行）。
 """
 from __future__ import annotations
 
@@ -24,18 +32,19 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import (
     DataTable,
     OptionList,
-    RadioButton,
-    RadioSet,
     Sparkline,
     Static,
 )
 from textual.widgets.option_list import Option
 
+from tui.components.chips import ChipBar
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.theme.generated import tokens as design
 
 WINDOW_POINTS = 60          # Sparkline 滚动窗口（方案 §3.4）
 POLL_INTERVAL = 0.5         # KPI/曲线刷新节流 500ms
 PROC_INTERVAL = 5.0         # 进程表扫描周期
+RUN_FRAME_INTERVAL_S = 1.0  # 运行行 ◈/◉ 交替帧周期（L15，仅运行期间起表）
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 # 模块 cli.py 路径段 → conda 环境名（进程表「环境」列推断；task_scheduler.MODULE_MAP 同源）
@@ -43,6 +52,8 @@ _MODULE_ENVS = {
     "spider": "env_spider", "mineru": "env_mineru", "wpd": "env_wpd",
     "anydoc": "env_anydoc", "md2docx": "env_md2docx",
 }
+
+RUN_ICONS = ("task.running", "task.running_f2")  # ◈/◉ 交替帧（icons.yaml 帧动画）
 
 
 def mem_severity(mem_gb: float, warn_gb: float, crit_gb: float) -> str:
@@ -74,8 +85,7 @@ def derive_alerts(
 ) -> list[tuple[str, str]]:
     """本地告警推导 → [(级别 token, 文案)]；warn=熔金 ▲ / error=nova ✕。
 
-    注：服务核心尚无 WS alert 事件广播（alerts 表未接路由），此处先由内存
-    阈值与通道状态推导，服务端事件接入后并入同列。
+    服务端 WS alert 事件（L16）由 _render_alerts 与本推导并入同列。
     """
     alerts: list[tuple[str, str]] = []
     if sample is not None:
@@ -151,8 +161,10 @@ def scan_processes(repo_root: Path = REPO_ROOT, limit: int = 20) -> list[dict]:
     return rows[:limit]
 
 
-class MonitorPage(VerticalScroll):
+class MonitorPage(VerticalScroll, EnvGateMixin):
     """星象台：KPI + 曲线 + 进程表 + 告警 + 历史回放。"""
+
+    GATE_DISABLE = ("#mon-range",)  # PG 缺失：历史回放入口禁用（实时区不受影响）
 
     def __init__(self, client, app_ref=None) -> None:  # noqa: ANN001（App 循环依赖）
         super().__init__(id="page-monitor")
@@ -160,6 +172,10 @@ class MonitorPage(VerticalScroll):
         self._app = app_ref
         self._range = "实时"
         self._alert_signature = ""
+        self._alert_targets: dict[str, str | None] = {}  # 行 id → task_uuid（L16）
+        self._proc_rows: list[dict] = []                 # 最近一次进程扫描缓存
+        self._run_frame = 0                              # ◈/◉ 交替帧计数
+        self._run_timer = None                           # 交替帧表（仅运行期间起）
 
     def compose(self) -> ComposeResult:
         yield Static(
@@ -178,9 +194,8 @@ class MonitorPage(VerticalScroll):
                 min_color=design.DARK["hydrogen"], max_color=design.DARK["hydrogen"],
                 id="spark-mem",
             )
-        yield RadioSet(
-            *[RadioButton(label, value=(i == 0))
-              for i, label in enumerate(("实时", "1h", "6h", "24h"))],
+        yield ChipBar(  # L17：range 统一胶囊 chips（去 RadioSet）
+            [("实时", "实时"), ("1h", "1h"), ("6h", "6h"), ("24h", "24h")],
             id="mon-range",
         )
         yield Static("[b]告警[/b]", id="mon-alerts-title")
@@ -193,6 +208,8 @@ class MonitorPage(VerticalScroll):
         table.cursor_type = "row"
         self.set_interval(POLL_INTERVAL, self._tick)
         self.set_interval(PROC_INTERVAL, self._tick_procs)
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self._tick_procs()
 
     # ---- 实时区（app.MonitorState → UI） ----
@@ -214,18 +231,36 @@ class MonitorPage(VerticalScroll):
         mem = self.query_one("#spark-mem")
         cpu.data = list(state["cpu_window"])
         mem.data = list(state["mem_window"])
-        self._render_alerts(derive_alerts(
-            sample, state["warn_gb"], state["crit_gb"], state["ws_connected"],
-        ))
+        # L16：本地推导 + WS type=alert 实时事件并入一列
+        self._render_alerts(
+            derive_alerts(sample, state["warn_gb"], state["crit_gb"],
+                          state["ws_connected"]),
+            list(state.get("ws_alerts") or []),
+        )
 
-    def _render_alerts(self, alerts: list[tuple[str, str]]) -> None:
-        signature = "|".join(f"{level}:{text}" for level, text in alerts)
+    def _render_alerts(self, alerts: list[tuple[str, str]],
+                       ws_alerts: list[dict] | None = None) -> None:
+        """告警渲染（L16）：本地推导 + WS alert 并列；带 task_uuid 的行记入
+        _alert_targets，Enter 按 uuid 定位任务详情。"""
+        entries: list[tuple[str, str, str | None]] = [
+            (level, text, None) for level, text in alerts]
+        for item in ws_alerts or []:
+            message = str(item.get("message") or "").strip()
+            if not message:
+                continue
+            level = "error" if str(item.get("level")) == "error" else "warn"
+            source = str(item.get("source") or "server")
+            uuid = str(item.get("task_uuid") or "") or None
+            entries.append((level, f"[{source}] {message}", uuid))
+        signature = "|".join(f"{level}:{text}:{uuid}" for level, text, uuid in entries)
         if signature == self._alert_signature:
             return
         self._alert_signature = signature
+        self._alert_targets = {f"alert-{index}": uuid
+                               for index, (_l, _t, uuid) in enumerate(entries)}
         board = self.query_one("#mon-alerts", OptionList)
         board.clear_options()
-        if not alerts:
+        if not entries:
             board.add_option(Option(
                 f"[$aurora]{design.icon('status.ok')}[/$aurora] 星域平静 · 无告警",
                 id="alert-none",
@@ -235,31 +270,48 @@ class MonitorPage(VerticalScroll):
             return
         board.add_class("alerted")
         self.query_one("#mon-alerts-title", Static).update(
-            f"[b]告警[/b]  [$molten]{len(alerts)} 条待处理[/$molten]"
-            if all(level == "warn" for level, _ in alerts) else
-            f"[b]告警[/b]  [$nova]{len(alerts)} 条待处理[/$nova]"
+            f"[b]告警[/b]  [$molten]{len(entries)} 条待处理[/$molten]"
+            if all(level == "warn" for level, _t, _u in entries) else
+            f"[b]告警[/b]  [$nova]{len(entries)} 条待处理[/$nova]"
         )
-        for index, (level, text) in enumerate(alerts):
+        for index, (level, text, _uuid) in enumerate(entries):
             if level == "error":
                 mark = f"[$nova]{design.icon('status.error')}[/$nova]"
             else:
                 mark = f"[$molten]{design.icon('status.warn')}[/$molten]"
             board.add_option(Option(f" {mark} {text}", id=f"alert-{index}"))
 
+    # ---- 进程表（◈/◉ 1s 有界交替帧，仅运行期间起表，L15）----
     def _tick_procs(self) -> None:
+        self._proc_rows = scan_processes()
+        self._render_procs()
+        has_running = any(row["module_task"] for row in self._proc_rows)
+        if has_running and self._run_timer is None:
+            self._run_timer = self.set_interval(RUN_FRAME_INTERVAL_S, self._tick_run_frame)
+        elif not has_running and self._run_timer is not None:
+            self._run_timer.stop()
+            self._run_timer = None
+
+    def _tick_run_frame(self) -> None:
+        self._run_frame += 1
+        self._render_procs()
+
+    def _render_procs(self) -> None:
         table = self.query_one("#mon-procs", DataTable)
         table.clear(columns=False)
-        for row in scan_processes():
-            prefix = (f"[dim]{design.icon('task.running')}[/dim] "
-                      if row["module_task"] else "  ")
+        icon = design.icon(RUN_ICONS[self._run_frame % len(RUN_ICONS)])
+        for row in self._proc_rows:
+            prefix = (f"[dim]{icon}[/dim] " if row["module_task"] else "  ")
             table.add_row(
                 str(row["pid"]), f"{prefix}{row['name']}", row["env"],
                 f"{row['cpu']:.1f}", f"{row['mem_mb']:.0f}",
             )
 
     # ---- 历史回放（range 胶囊 → /monitor/history 整段重绘） ----
-    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        label = str(event.pressed.label)
+    def on_chip_bar_changed(self, event: ChipBar.Changed) -> None:
+        if event.chip_bar.id != "mon-range":
+            return
+        label = str(event.value)
         self._range = label
         if label == "实时":
             return
@@ -286,10 +338,29 @@ class MonitorPage(VerticalScroll):
         self.query_one("#spark-cpu").data = [p["cpu_percent"] for p in points]
         self.query_one("#spark-mem").data = [p["mem_used_gb"] for p in points]
 
+    # ---- 告警行 Enter → 按 task_uuid 定位任务详情（L16）----
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        """告警行 Enter → 跳转任务历史（对齐「Enter 跳转对应任务」）。"""
-        if event.option_id and event.option_id.startswith("alert-") and self._app is not None:
-            self._app.switch_page_by_key("history")
+        option_id = event.option_id or ""
+        if self._app is None or not option_id.startswith("alert-"):
+            return
+        if option_id == "alert-none":
+            return
+        task_uuid = self._alert_targets.get(option_id)
+        if not task_uuid:
+            self._app.switch_page_by_key("history")  # 无 uuid 回落：仅切历史页
+            return
+        self.run_worker(self._open_task_detail(task_uuid), exclusive=True)
+
+    async def _open_task_detail(self, task_uuid: str) -> None:
+        from tui.plugins.history.page import HistoryDetailScreen  # 局部导入防环
+
+        try:
+            detail = await self.client.task_detail(task_uuid)
+        except Exception as exc:
+            self.app.notify(f"任务详情拉取失败：{exc}", severity="error")
+            return
+        self._app.switch_page_by_key("history")  # 底页先切历史（关抽屉即落在任务处）
+        self._app.push_screen(HistoryDetailScreen(self.client, detail))
 
 
 class MonitorState(dict):
@@ -297,7 +368,7 @@ class MonitorState(dict):
 
     以 dict 子类承载便于直接下标读取；字段：
     sample/prev_ts/read_mbps/write_mbps/cpu_window/mem_window/ws_connected/
-    running_count/warn_gb/crit_gb/updated_at
+    running_count/warn_gb/crit_gb/updated_at/ws_alerts（L16：type=alert 事件队列）
     """
 
     @classmethod
@@ -308,6 +379,7 @@ class MonitorState(dict):
             "mem_window": deque(maxlen=WINDOW_POINTS),
             "ws_connected": False, "running_count": 0,
             "warn_gb": warn_gb, "crit_gb": crit_gb, "updated_at": 0.0,
+            "ws_alerts": deque(maxlen=20),
         })
 
     def ingest(self, sample: dict) -> None:
@@ -327,3 +399,8 @@ class MonitorState(dict):
         self["sample"] = sample
         self["prev_ts"] = now
         self["updated_at"] = now
+
+    def push_alert(self, alert: dict) -> None:
+        """并入一条 /ws/monitor type=alert 事件（信封 payload，L16）。"""
+        self["ws_alerts"].append(dict(alert))
+        self["updated_at"] = time.monotonic()

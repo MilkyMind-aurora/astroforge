@@ -2,7 +2,8 @@
 """命令面板（方案 §3.6，插件注册表驱动）：/ 唤起，输入防抖 150ms（Provider 自带）。
 
 命令全集：注册页直达 / 文件浏览器 / 日志面板 / 星伴 / 主题切换（deep-space/dawn）
-/ 刷新体检 / 重连。页面项随插件注册表与 pages.yaml 显隐动态生成（§2.4）。
+/ 刷新体检 / 重连 / 退出（L9⑨ 补「退出」命令位，与 q 快捷键同 action）。
+页面项随插件注册表与 pages.yaml 显隐动态生成（§2.4）。
 """
 from __future__ import annotations
 
@@ -30,6 +31,7 @@ class ForgeCommands(Provider):
                 lambda name=name: app.action_set_theme(name),
             ) for name in design.THEMES],
             ("重连服务核心", app.reconnect),
+            ("退出 AstroForge（q）", app.action_quit),
         ]
         return items
 

@@ -4,6 +4,7 @@ python -m astroforge serve            前台启动服务核心
 python -m astroforge serve --daemon   守护启动（Windows pythonw / macOS nohup 由脚本处理）
 python -m astroforge doctor           环境自检
 python -m astroforge export-openapi   导出 OpenAPI 契约
+python -m astroforge export-design    重渲染设计契约三端产物（scripts/gen_design.py）
 """
 from __future__ import annotations
 
@@ -86,6 +87,24 @@ def load_settings_light():
         return settings
 
 
+def _cmd_export_design(_args: argparse.Namespace) -> int:
+    """重渲染设计契约三端产物：转调 scripts/gen_design.py 主入口（同一事实源）。
+
+    产物以默认星野种子入库；改 tokens.yaml 后必须重跑本命令（CI diff=0 门禁）。
+    """
+    from pathlib import Path
+
+    scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+    if not (scripts_dir / "gen_design.py").is_file():
+        print(f"[astroforge] 未找到 {scripts_dir / 'gen_design.py'}"
+              f"（export-design 仅支持仓库树内运行）", file=sys.stderr)
+        return 1
+    sys.path.insert(0, str(scripts_dir))
+    import gen_design
+
+    return gen_design.main([])  # 显式空 argv：不得让子命令名漏进 gen_design 的解析器
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="astroforge", description="AstroForge Sidereal Core 服务核心")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -102,6 +121,11 @@ def main(argv: list[str] | None = None) -> int:
     export = sub.add_parser("export-openapi", help="导出 OpenAPI 契约")
     export.add_argument("--output", default="docs/openapi.json")
     export.set_defaults(func=_cmd_export_openapi)
+
+    export_design = sub.add_parser(
+        "export-design", help="重渲染设计契约三端产物（scripts/gen_design.py；CI diff=0 门禁同源）"
+    )
+    export_design.set_defaults(func=_cmd_export_design)
 
     args = parser.parse_args(argv)
     return args.func(args)

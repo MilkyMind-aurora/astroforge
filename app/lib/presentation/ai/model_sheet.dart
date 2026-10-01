@@ -181,7 +181,7 @@ class _ModelRow extends StatelessWidget {
               AstroIcons.aiIdle,
               style: TextStyle(
                 color: selected ? palette.nebula : palette.ink600,
-                fontSize: 15,
+                fontSize: AstroType.titleSm.size,
               ),
             ),
             const SizedBox(width: 10),
@@ -217,7 +217,7 @@ class _ModelRow extends StatelessWidget {
             else if (selected)
               Text(
                 AstroIcons.taskSuccess,
-                style: TextStyle(color: palette.aurora, fontSize: 15),
+                style: TextStyle(color: palette.aurora, fontSize: AstroType.titleSm.size),
               ),
           ],
         ),

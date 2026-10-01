@@ -26,6 +26,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.components.task_card import TaskProgressCard
 from tui.service_client import ServiceClient
 from tui.theme.generated import tokens as design
@@ -33,10 +34,11 @@ from tui.theme.generated import tokens as design
 ANYDOC_TAB, MD2DOCX_TAB = "入库 anydoc（Office→MD）", "出库 md2docx（MD→Word）"
 
 
-class ConverterPage(VerticalScroll):
+class ConverterPage(VerticalScroll, EnvGateMixin):
     """转换中心：anydoc 入库 / md2docx 出库双卡表单 + 任务进度卡。"""
 
     BINDINGS = [Binding("f", "pick_path", "选路径")]
+    GATE_DISABLE = ("#conv-input", "#conv-tpl", "#conv-merge", "#conv-run")
 
     CSS = """
     #conv-form { border: round $border-subtle; background: $card; padding: 0 2;
@@ -85,6 +87,8 @@ class ConverterPage(VerticalScroll):
         yield Static("", id="conv-result")
 
     def on_mount(self) -> None:
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self._sync_tab()
         self.run_worker(self._load_templates(), exclusive=True)
 

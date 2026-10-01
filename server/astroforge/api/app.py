@@ -11,6 +11,7 @@ import json
 import secrets
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
@@ -259,11 +260,73 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_request: Request, exc: RequestValidationError):
-        return JSONResponse(fail(ErrorCode.MISSING_PARAM, f"参数校验失败: {exc.errors()[:3]}"))
+        # 终审 L28：校验错误语义即「请求不合法」，必须 HTTP 400（此前漏传
+        # status_code 落为 200+1001，与 docs/openapi.json 记载的 422 双向失真）。
+        return JSONResponse(
+            fail(ErrorCode.MISSING_PARAM, f"参数校验失败: {exc.errors()[:3]}"),
+            status_code=400,
+        )
 
     @app.exception_handler(Exception)
     async def unhandled_handler(request: Request, exc: Exception):
         log.exception("未处理异常 %s %s", request.method, request.url.path)
         return JSONResponse(fail(ErrorCode.INTERNAL, f"服务内部错误: {exc}"))
+
+    # ---- OpenAPI 契约修正（终审 L28）：FastAPI 默认生成的 422 Validation Error
+    # 与实际行为不符——校验错误统一走上方 handler 返回 HTTP 400 + fail(1001) 信封。
+    # 在 app.openapi() 源头改写（export_openapi.py 与 Dart 客户端生成共用），
+    # 使契约层可见错误码分段（方案 3.8：0 成功 | 1xxx 参数 | 2xxx 服务 | 3xxx 模块 | 4xxx 资源）。
+    _openapi_base = app.openapi
+
+    def _openapi_with_error_contract() -> dict[str, Any]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        spec = _openapi_base()
+        validation_400 = {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001"
+                           "（MISSING_PARAM，1xxx 参数段）",
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/ErrorEnvelope"},
+                },
+            },
+        }
+        for path_item in spec.get("paths", {}).values():
+            for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue  # 跳过 path 级 parameters 等非操作项
+                responses = operation.get("responses") or {}
+                if "422" in responses:
+                    responses.pop("422")
+                    responses["400"] = validation_400
+        schemas = spec.setdefault("components", {}).setdefault("schemas", {})
+        schemas.pop("HTTPValidationError", None)
+        schemas.pop("ValidationError", None)
+        schemas["ErrorEnvelope"] = {
+            "title": "ErrorEnvelope",
+            "description": (
+                "统一响应信封（方案 3.8）。code 错误码分段："
+                "0 成功 | 1xxx 参数（1001 参数校验失败 / 1002 路径非法 / "
+                "1003 模板非法 / 1004 YAML 非法）| 2xxx 服务 | "
+                "3xxx 模块执行 | 4xxx 资源。"
+            ),
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "title": "Code",
+                    "description": "错误码分段：0 成功，1xxx 参数，2xxx 服务，"
+                                   "3xxx 模块执行，4xxx 资源",
+                    "examples": [1001],
+                },
+                "message": {"type": "string", "title": "Message"},
+                "data": {"title": "Data"},
+            },
+            "required": ["code", "message"],
+        }
+        app.openapi_schema = spec
+        return spec
+
+    app.openapi = _openapi_with_error_contract  # type: ignore[method-assign]
 
     return app

@@ -15,6 +15,7 @@ from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Button, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.components.task_card import TaskProgressCard
 from tui.components.timeline import StepTimeline
 from tui.service_client import ServiceClient
@@ -23,8 +24,10 @@ from tui.theme.generated import tokens as design
 STEPS_REFRESH_S = 2.0  # 运行时间线轮询周期（steps 无独立 WS 事件，详情轮询补齐）
 
 
-class PipelinePage(VerticalScroll):
+class PipelinePage(VerticalScroll, EnvGateMixin):
     """流水线：模板选择运行 + 运行时间线 + YAML 保存为自定义模板。"""
+
+    GATE_DISABLE = ("#pl-run", "#pl-save", "#pl-yaml")
 
     CSS = """
     #pl-form { border: round $border-subtle; background: $card; padding: 0 2;
@@ -41,10 +44,10 @@ class PipelinePage(VerticalScroll):
     def __init__(self, client: ServiceClient, app_ref=None) -> None:  # noqa: ANN001
         super().__init__(id="page-pipeline")
         self.client = client
+        self._app = app_ref
         self._pipelines: list[dict] = []
         self._task_uuid: str | None = None
         self._active = False
-
 
     async def _auto_reload_steps(self) -> None:
         if self._active and self._task_uuid:
@@ -71,6 +74,8 @@ class PipelinePage(VerticalScroll):
 
     def on_mount(self) -> None:
         self.set_interval(STEPS_REFRESH_S, self._auto_reload_steps)
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self.run_worker(self.refresh_pipelines(), exclusive=True)
 
     # ---- 模板卡 ----

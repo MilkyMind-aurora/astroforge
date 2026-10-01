@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """采集中心（方案 §3.3 表单卡族升级，MF2）：四类任务 + 输入井 + 高级折叠 + 中止。
 
-- 功能选择 RadioSet 胶囊化（单页转 MD ☄ / 整站结构化 ✺ / PDF 批量 ⬇ / 表格抓取 ▦，
-  星符语义映射见 _TASK_TYPES）
+- 功能选择胶囊 chips（components.chips.ChipBar，L9③ 去 RadioSet 文实不符：
+  单页转 MD ☄ / 整站结构化 ✺ / PDF 批量 ⬇ / 表格抓取 ▦，星符语义映射见
+  _TASK_TYPES）
 - URL 输入井：sunken 底 + 聚焦描边升档（border-active=aurora，V1.2-1 盒式语言）
 - 高级参数折叠区：「✧ 高级 ▸/▾」行内展开（TUI 无 animateContentSize，瞬时展开）
 - 提交钮全宽 aurora 实底；busy 态转「中止」（nova 描边，POST /tasks/{uuid}/cancel）
+- 环境门禁（L9②）：env_dep=Chromium 缺失时禁用表单 + 挂缺失卡（env_gate）
 - 提交后下半区挂共用任务进度卡（components.task_card，WS progress 事件驱动）
 数据契约：POST /tasks → 订阅 /ws/logs/{uuid}；GET /tasks/{uuid} 兜底。
 """
@@ -14,8 +16,10 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
-from textual.widgets import Button, Input, RadioButton, RadioSet, Static
+from textual.widgets import Button, Input, Static
 
+from tui.components.chips import ChipBar
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.components.task_card import TaskProgressCard
 from tui.service_client import ServiceClient
 from tui.theme.generated import tokens as design
@@ -29,10 +33,11 @@ _TASK_TYPES: list[tuple[str, str, str]] = [
 ]
 
 
-class SpiderPage(VerticalScroll):
+class SpiderPage(VerticalScroll, EnvGateMixin):
     """采集中心：表单卡 + 任务进度卡 + 最近任务。"""
 
     BINDINGS = [Binding("f", "pick_path", "选路径", show=False)]
+    GATE_DISABLE = ("#sp-url", "#sp-output", "#sp-pages", "#sp-interval", "#sp-run")
 
     CSS = """
     #sp-form { border: round $border-subtle; background: $card; padding: 0 2;
@@ -61,10 +66,9 @@ class SpiderPage(VerticalScroll):
             classes="page-body")
         with Vertical(id="sp-form"):
             yield Static("任务类型", classes="page-body")
-            yield RadioSet(
-                *[RadioButton(
-                    f"{design.icon(icon)} {label}", value=(i == 0))
-                  for i, (_key, icon, label) in enumerate(_TASK_TYPES)],
+            yield ChipBar(
+                [(key, f"{design.icon(icon)} {label}")
+                 for key, icon, label in _TASK_TYPES],
                 id="sp-type",
             )
             yield Input(placeholder="目标 URL（必填，https://…）", id="sp-url")
@@ -82,21 +86,18 @@ class SpiderPage(VerticalScroll):
         yield Static("[b]最近任务[/b]  （加载中…）", id="sp-recent")
 
     def on_mount(self) -> None:
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self.run_worker(self.refresh_recent(), exclusive=True)
 
     # ---- 表单 ----
     def _selected_type(self) -> str:
-        selected = self.query_one("#sp-type", RadioSet).selected or ""
-        for key, _icon, label in _TASK_TYPES:
-            if label in selected:
-                return key
-        return "spider_single"
+        return self.query_one("#sp-type", ChipBar).selected or "spider_single"
 
-    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+    def on_chip_bar_changed(self, event: ChipBar.Changed) -> None:
         """整站才有 max_pages；类型切换时联动高级区字段显隐（轻交互）。"""
-        if event.radio_set.id == "sp-type":
-            key = self._selected_type()
-            self.query_one("#sp-pages", Input).display = key == "spider_site"
+        if event.chip_bar.id == "sp-type":
+            self.query_one("#sp-pages", Input).display = event.value == "spider_site"
 
     def on_static_click(self, event: Static.Click) -> None:
         """「✧ 高级」折叠区行内展开/收起（§3.3）。"""

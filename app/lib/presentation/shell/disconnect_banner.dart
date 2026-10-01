@@ -35,7 +35,7 @@ class DisconnectBanner extends ConsumerWidget {
                         children: [
                           Text(
                             AstroIcons.statusIdle,
-                            style: TextStyle(color: palette.nova, fontSize: 12),
+                            style: TextStyle(color: palette.nova, fontSize: AstroType.caption.size),
                           ),
                           const SizedBox(width: 8),
                           Expanded(

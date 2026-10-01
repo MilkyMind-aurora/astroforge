@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/design/design.dart';
+import '../../core/eta/eta_estimator.dart';
 import '../../data/api_client/dio_client.dart';
 import '../../data/ws_client/ws_client.dart';
 
@@ -51,6 +52,7 @@ class _MonitorSheetState extends ConsumerState<MonitorSheet> {
   bool _cpuVisible = true;
   bool _memVisible = true;
   int _runningCount = 0;
+  Duration? _maxRunningEta; // 运行任务最长剩余（M5：可估算者取最大）
   double? _warnGb;
   double? _critGb;
   final ValueNotifier<FlSpot?> _hoverSpot = ValueNotifier(null);
@@ -87,7 +89,21 @@ class _MonitorSheetState extends ConsumerState<MonitorSheet> {
     try {
       final items = await ref.read(apiClientProvider).listTasks(status: 'running');
       if (!mounted) return;
-      setState(() => _runningCount = items.length);
+      // M5 ETA：运行任务逐个折算剩余，告警条报「最长剩余」（>10s 长时档才计）
+      Duration? maxEta;
+      for (final raw in items) {
+        final t = (raw as Map).cast<String, dynamic>();
+        final eta = estimateTaskEta(
+          progress: (t['progress'] as num?)?.toInt() ?? 0,
+          startedAt: DateTime.tryParse(t['started_at'] as String? ?? ''),
+          now: DateTime.now(),
+        );
+        if (eta != null && (maxEta == null || eta > maxEta)) maxEta = eta;
+      }
+      setState(() {
+        _runningCount = items.length;
+        _maxRunningEta = shouldShowEta(maxEta) ? maxEta : null;
+      });
     } on ApiError {
       // 计数失败保留旧值（瞬时档：stale-while-revalidate）
     }
@@ -145,6 +161,7 @@ class _MonitorSheetState extends ConsumerState<MonitorSheet> {
         cpuVisible: _cpuVisible,
         memVisible: _memVisible,
         runningCount: _runningCount,
+        maxRunningEta: _maxRunningEta,
         warnGb: _warnGb,
         critGb: _critGb,
         hoverSpot: _hoverSpot,
@@ -172,6 +189,7 @@ class _SheetBody extends StatelessWidget {
     required this.cpuVisible,
     required this.memVisible,
     required this.runningCount,
+    required this.maxRunningEta,
     required this.warnGb,
     required this.critGb,
     required this.hoverSpot,
@@ -188,6 +206,9 @@ class _SheetBody extends StatelessWidget {
   final bool cpuVisible;
   final bool memVisible;
   final int runningCount;
+
+  /// 运行任务最长剩余（M5；null=无可估或瞬时档）。
+  final Duration? maxRunningEta;
   final double? warnGb;
   final double? critGb;
   final ValueNotifier<FlSpot?> hoverSpot;
@@ -306,6 +327,7 @@ class _SheetBody extends StatelessWidget {
             _AlertStrip(
               severity: _memSeverity(window.latest?.memUsedGb),
               runningCount: runningCount,
+              maxRunningEta: maxRunningEta,
               palette: palette,
             ),
 
@@ -624,11 +646,15 @@ class _AlertStrip extends StatelessWidget {
   const _AlertStrip({
     required this.severity,
     required this.runningCount,
+    required this.maxRunningEta,
     required this.palette,
   });
 
   final _Severity severity;
   final int runningCount;
+
+  /// 运行任务最长剩余（M5；null=无可估或瞬时档——不显示，禁伪造）。
+  final Duration? maxRunningEta;
   final AstroPalette palette;
 
   @override
@@ -639,10 +665,15 @@ class _AlertStrip extends StatelessWidget {
       _Severity.warn => palette.moltenText,
       _Severity.crit => palette.nova,
     };
+    final etaText = maxRunningEta == null
+        ? ''
+        : ' · 最长剩余 ${formatEta(maxRunningEta!)}（按进度速率折算）';
     final text = switch (severity) {
-      _Severity.none => runningCount == 0 ? '一切平静 · 无运行任务 · 无告警' : '运行任务 $runningCount · 无告警',
-      _Severity.warn => '内存超预警阈值 ▲ 建议收任务',
-      _Severity.crit => '内存超红线 ✕ 请立即收任务',
+      _Severity.none => runningCount == 0
+          ? '一切平静 · 无运行任务 · 无告警'
+          : '运行任务 $runningCount · 无告警$etaText',
+      _Severity.warn => '内存超预警阈值 ▲ 建议收任务$etaText',
+      _Severity.crit => '内存超红线 ✕ 请立即收任务$etaText',
     };
     return Container(
       width: double.infinity,

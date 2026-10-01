@@ -10,7 +10,8 @@
                                未覆盖键回落全局）
 
 产物（全部确定性输出：同输入必同字节，幂等即 CI 门禁 V1-B.5）：
-  tui/tui/theme/generated/tokens.tcss   Textual 工具类样式（默认主题 deep-space）
+  tui/tui/theme/generated/tokens.tcss   Textual 工具类样式（默认主题 deep-space：
+                                        $变量声明 + .c-*/.bg-*/.border-* 语义类）
   tui/tui/theme/generated/tokens.py     Python 常量 + css_variables() + 星符表
   app/lib/core/design/tokens.g.dart     AstroPalette / lerpPalette / AstroTheme 工厂
                                         （替代 app/lib/core/theme.dart，禁 fromSeed）
@@ -23,7 +24,8 @@
 
 用法：
   python scripts/gen_design.py             # 全量生成（星野用默认种子）
-  python scripts/gen_design.py --seed 42   # 以指定种子重生成星野坐标
+  python scripts/gen_design.py --seed 42   # 以指定种子重生成星野坐标（仅本地预览；
+                                           # 非默认种子产物提交必挂 CI diff=0 门禁）
 
 退出码：0=成功；2=设计源校验失败（先修 yaml 再谈生成）。
 """
@@ -407,28 +409,38 @@ def _py_lines(value: Any, indent: int) -> list[str]:
 
 
 def render_tui_tcss(palette: dict[str, str], border_levels: dict[str, str], sha: str) -> str:
-    """Textual 工具类样式：默认主题（deep-space 夜）字面色 + 语义类名。"""
+    """Textual 工具类样式（§2.3）：默认主题（deep-space 夜）$变量声明 + 语义类名。
+
+    - $变量 = 默认档字面值，变量名与 tokens.css_variables() 运行时键一致（$aurora、
+      $ink-900、$chipsSelectedBg…）。Textual 代入序（实测 textual 8.2.8）：每份 CSS
+      源独立从运行时变量表拷贝出发，文件内声明值追加在运行时同名值之后——因此本
+      文件类值恒为默认档（与旧字面值产物逐类一致，TUI 消费零改动）；声明不外溢到
+      其他源，主题热切仍由 App.get_css_variables + refresh_css 在各屏 CSS 承担（§1.5）。
+    - 工具类一律引用 $变量、禁字面 hex（§3.7 ①）；类名 API 不变（.c-*/.bg-*/.border-*）。
+    """
     lines = [
         "/* ============================================================",
         " * AstroForge TUI token 样式（生成物 —— scripts/gen_design.py，禁手改）",
         f" * 源：config/design/tokens.yaml（sha256:{sha}）",
         f" * 默认主题：{DEFAULT_THEME}（夜）；类名 = 前缀 + token 名（.c-ink-900/.bg-card）。",
-        " * 主题热切走 tokens.py css_variables() + refresh_css（§1.5），本文件是默认档。",
+        " * $变量 = 默认档字面值（§2.3）；本文件类值恒为默认档（Textual 代入序：",
+        " * 文件声明追加在运行时同名值之后），主题热切走 tokens.py css_variables()",
+        " * + refresh_css 在各屏 CSS 承担（§1.5）。",
         " * ============================================================ */",
         "",
-        "/* 文字（ink 阶梯 + 强调色文本位；夜档强调色文本图形双用） */",
+        "/* 设计变量（默认档字面值；同名运行时变量优先） */",
     ]
-    lines += [f".c-{name} {{ color: {palette[name]}; }}" for name in TCSS_TEXT_TOKENS]
+    lines += [f"${name}: {value};" for name, value in palette.items()]
+    lines += ["", "/* 文字（ink 阶梯 + 强调色文本位；夜档强调色文本图形双用） */"]
+    lines += [f".c-{name} {{ color: ${name}; }}" for name in TCSS_TEXT_TOKENS]
     lines += ["", "/* 表面阶梯（唯一合法表面，禁自造中间值） */"]
-    lines += [f".bg-{name} {{ background: {palette[name]}; }}" for name in TCSS_SURFACE_TOKENS]
+    lines += [f".bg-{name} {{ background: ${name}; }}" for name in TCSS_SURFACE_TOKENS]
+    lines += ["", "/* 盒式语言边框三档（V1.2-1 对齐 opencode subtle/normal/active） */"]
     lines += [
-        "",
-        "/* 盒式语言边框三档（V1.2-1 对齐 opencode subtle/normal/active） */",
-        f".border-subtle {{ border: round {palette[border_levels['subtle']]}; }}",
-        f".border-normal {{ border: round {palette[border_levels['normal']]}; }}",
-        f".border-active {{ border: round {palette[border_levels['active']]}; }}",
-        "",
+        f".border-{level} {{ border: round ${border_levels[level]}; }}"
+        for level in ("subtle", "normal", "active")
     ]
+    lines += [""]
     return "\n".join(lines)
 
 
@@ -1101,7 +1113,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--seed", type=int, default=DEFAULT_STAR_SEED,
-        help=f"星野种子（默认 {DEFAULT_STAR_SEED}；种子决定 60~90 颗星点的确定性坐标）",
+        help=f"星野种子（默认 {DEFAULT_STAR_SEED}；种子决定 60~90 颗星点的确定性坐标）。"
+             f"仅限本地预览：非默认种子的 seed.json 一经提交必挂 CI diff=0 门禁，"
+             f"入库产物一律以默认种子生成",
     )
     args = parser.parse_args(argv)
     banner("gen_design", "设计契约渲染器 · config/design → TUI/Flutter/CLI 产物")

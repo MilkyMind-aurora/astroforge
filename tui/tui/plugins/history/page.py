@@ -19,11 +19,13 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.content import Content
 from textual.geometry import Offset
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, RichLog, Static
 
 from tui.components.chips import ChipBar
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.components.theme import theme_token as _theme_token
 from tui.components.timeline import StepTimeline
 from tui.service_client import ServiceClient
@@ -90,6 +92,7 @@ class HistoryDetailScreen(Screen):
         self.task_data = dict(task)
         self._undo_left = 0
         self._undo_task: str | None = None
+        self._undo_timer = None  # 撤销倒计时句柄（L9⑦：重试前先停旧表防叠加）
 
     def compose(self) -> ComposeResult:
         task = self.task_data
@@ -181,7 +184,17 @@ class HistoryDetailScreen(Screen):
         undo = self.query_one("#hd-undo", Static)
         undo.add_class("undo-on")
         self._render_undo()
-        self.set_interval(1.0, self._tick_undo)
+        self._start_undo_timer()  # L9⑦：句柄去重，先停旧表再起表
+
+    def _start_undo_timer(self) -> None:
+        if self._undo_timer is not None:
+            self._undo_timer.stop()
+        self._undo_timer = self.set_interval(1.0, self._tick_undo)
+
+    def _stop_undo_timer(self) -> None:
+        if self._undo_timer is not None:
+            self._undo_timer.stop()
+            self._undo_timer = None
 
     def _render_undo(self) -> None:
         left = self._undo_left
@@ -195,16 +208,19 @@ class HistoryDetailScreen(Screen):
     async def _tick_undo(self) -> None:
         self._undo_left -= 1
         if not self.is_current:  # 抽屉已关（撤销完成/手动退出）即停表
+            self._stop_undo_timer()
             return
         if self._undo_left > 0:
             self._render_undo()
             return
+        self._stop_undo_timer()
         self.query_one("#hd-undo", Static).remove_class("undo-on")
         self.app.notify("重试已生效", severity="information")
         self.action_dismiss_drawer()
 
     async def _undo(self) -> None:
         """撤销：取消刚创建的新任务（pending 态可取消）。"""
+        self._stop_undo_timer()
         if not self._undo_task:
             return
         try:
@@ -247,8 +263,10 @@ class HistoryDetailScreen(Screen):
         self.dismiss()
 
 
-class HistoryPage(VerticalScroll):
+class HistoryPage(VerticalScroll, EnvGateMixin):
     """任务历史：chips 筛选 + DataTable + 详情抽屉。"""
+
+    GATE_DISABLE = ("#his-filter",)  # PG 缺失：筛选禁用 + 缺失卡（表刷新本就失败）
 
     CSS = """
     #his-title { color: $ink-900; margin-top: 1; }
@@ -258,6 +276,7 @@ class HistoryPage(VerticalScroll):
     def __init__(self, client: ServiceClient, app_ref=None) -> None:  # noqa: ANN001
         super().__init__(id="page-history")
         self.client = client
+        self._app = app_ref
 
     def compose(self) -> ComposeResult:
         yield Static(
@@ -271,6 +290,8 @@ class HistoryPage(VerticalScroll):
         table.add_columns("任务", "状态", "类型", "标题", "耗时", "时刻", "错误")
         table.cursor_type = "row"
         self.set_interval(REFRESH_S, self._auto_refresh)
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self.run_worker(self.refresh_table(), exclusive=True)
 
     def on_chip_bar_changed(self, event: ChipBar.Changed) -> None:
@@ -296,18 +317,25 @@ class HistoryPage(VerticalScroll):
         for task in (data or {}).get("items", []):
             status = str(task.get("status", "pending"))
             glyph, color = STATUS_META.get(status, ("task.pending", "ink-400"))
+            # 状态列用 Textual Content markup：DataTable 单元格经 Rich
+            # Text.from_markup 渲染，不识别 $语义变量标签（潜在崩溃点），
+            # Content 对象可直通由 DataTable 原生渲染
+            status_cell = Content.from_markup(
+                f"[${color}]{design.icon(glyph)} {status}[/]")
+            # 行键=完整 uuid（L9⑧：精确匹配，前 8 位仅作显示，杜绝前缀碰撞）
             table.add_row(
                 str(task.get("task_uuid"))[:8],
-                f"[${color}]{design.icon(glyph)} {status}[/]",
+                status_cell,
                 str(task.get("task_type", "?")),
                 str(task.get("title") or "-"),
                 duration_text(task.get("started_at"), task.get("finished_at")),
                 local_time(task.get("created_at")),
                 str(task.get("error_code") or "-"),
+                key=str(task.get("task_uuid")),
             )
 
     async def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """回车打开行详情抽屉（按 uuid 前 8 位回查完整任务字典）。"""
+        """回车打开行详情抽屉（按行键完整 uuid 精确回查，L9⑧）。"""
         row_key = event.row_key.value
         if not row_key:
             return
@@ -318,7 +346,7 @@ class HistoryPage(VerticalScroll):
         except Exception:
             data = {}
         task = next((t for t in (data or {}).get("items", [])
-                     if str(t.get("task_uuid", "")).startswith(row_key)), None)
+                     if str(t.get("task_uuid", "")) == row_key), None)
         if task is None:
             self.app.notify("任务详情不存在", severity="error")
             return

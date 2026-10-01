@@ -2,36 +2,70 @@
  * AstroForge TUI token 样式（生成物 —— scripts/gen_design.py，禁手改）
  * 源：config/design/tokens.yaml（sha256:06b559db8ba2）
  * 默认主题：deep-space（夜）；类名 = 前缀 + token 名（.c-ink-900/.bg-card）。
- * 主题热切走 tokens.py css_variables() + refresh_css（§1.5），本文件是默认档。
+ * $变量 = 默认档字面值（§2.3）；本文件类值恒为默认档（Textual 代入序：
+ * 文件声明追加在运行时同名值之后），主题热切走 tokens.py css_variables()
+ * + refresh_css 在各屏 CSS 承担（§1.5）。
  * ============================================================ */
 
+/* 设计变量（默认档字面值；同名运行时变量优先） */
+$bg: #05070F;
+$sunken: #0A0D18;
+$card: #10131F;
+$container: #171B2C;
+$cardRaised: #171B2C;
+$containerPressed: #1F2438;
+$faint: #222741;
+$ink-900: #EDF0FB;
+$ink-600: #9AA1C0;
+$ink-400: #858CB1;
+$stroke: #2A2F4D;
+$strokeFocus: #3A4066;
+$aurora: #4EE0C0;
+$auroraText: #4EE0C0;
+$nebula: #8B7CF6;
+$nebulaText: #8B7CF6;
+$hydrogen: #4FC3F7;
+$molten: #FFB74D;
+$moltenText: #FFB74D;
+$nova: #FF5648;
+$onAurora: #05070F;
+$onNebula: #05070F;
+$onHydrogen: #05070F;
+$onMolten: #05070F;
+$onNova: #05070F;
+$chipsSelectedBg: #172C32;
+$aiContainerBg: #21223D;
+$errorWashBg: #281A23;
+$runningWashBg: #141F29;
+$alertWashBg: #15232C;
+
 /* 文字（ink 阶梯 + 强调色文本位；夜档强调色文本图形双用） */
-.c-ink-900 { color: #EDF0FB; }
-.c-ink-600 { color: #9AA1C0; }
-.c-ink-400 { color: #858CB1; }
-.c-aurora { color: #4EE0C0; }
-.c-auroraText { color: #4EE0C0; }
-.c-nebula { color: #8B7CF6; }
-.c-nebulaText { color: #8B7CF6; }
-.c-hydrogen { color: #4FC3F7; }
-.c-molten { color: #FFB74D; }
-.c-moltenText { color: #FFB74D; }
-.c-nova { color: #FF5648; }
+.c-ink-900 { color: $ink-900; }
+.c-ink-600 { color: $ink-600; }
+.c-ink-400 { color: $ink-400; }
+.c-aurora { color: $aurora; }
+.c-auroraText { color: $auroraText; }
+.c-nebula { color: $nebula; }
+.c-nebulaText { color: $nebulaText; }
+.c-hydrogen { color: $hydrogen; }
+.c-molten { color: $molten; }
+.c-moltenText { color: $moltenText; }
+.c-nova { color: $nova; }
 
 /* 表面阶梯（唯一合法表面，禁自造中间值） */
-.bg-bg { background: #05070F; }
-.bg-sunken { background: #0A0D18; }
-.bg-card { background: #10131F; }
-.bg-container { background: #171B2C; }
-.bg-cardRaised { background: #171B2C; }
-.bg-containerPressed { background: #1F2438; }
-.bg-chipsSelectedBg { background: #172C32; }
-.bg-aiContainerBg { background: #21223D; }
-.bg-errorWashBg { background: #281A23; }
-.bg-runningWashBg { background: #141F29; }
-.bg-alertWashBg { background: #15232C; }
+.bg-bg { background: $bg; }
+.bg-sunken { background: $sunken; }
+.bg-card { background: $card; }
+.bg-container { background: $container; }
+.bg-cardRaised { background: $cardRaised; }
+.bg-containerPressed { background: $containerPressed; }
+.bg-chipsSelectedBg { background: $chipsSelectedBg; }
+.bg-aiContainerBg { background: $aiContainerBg; }
+.bg-errorWashBg { background: $errorWashBg; }
+.bg-runningWashBg { background: $runningWashBg; }
+.bg-alertWashBg { background: $alertWashBg; }
 
 /* 盒式语言边框三档（V1.2-1 对齐 opencode subtle/normal/active） */
-.border-subtle { border: round #222741; }
-.border-normal { border: round #2A2F4D; }
-.border-active { border: round #4EE0C0; }
+.border-subtle { border: round $faint; }
+.border-normal { border: round $stroke; }
+.border-active { border: round $aurora; }

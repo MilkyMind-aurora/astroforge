@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""启动屏（方案 §3.1）：银河渐变横幅 + ASCII 星仔 + 标语 + 探活跑圈。"""
+"""启动屏（方案 §3.1，L14 简化为首帧过渡）：银河渐变横幅 + ASCII 星仔 + 标语
++ 探活跑圈；探活成功即入工作台，超时回壳层并换装壳内嵌连接面板（ConnectPanel，
+不再整屏切换）。"""
 from __future__ import annotations
 
 import asyncio
@@ -19,8 +21,9 @@ SPIN_INTERVAL_S = 0.3  # 跑圈 4 帧 × 0.3s = 1.2s 一圈（#17 dur-loop 档�
 
 
 class BootScreen(Screen):
-    """启动屏：银河渐变横幅（白名单 tui_boot_banner，fg 按行三停驻色）
-    + ASCII 星仔 + 标语；探活期间跑圈字符（#17）；超时 5s 转连接引导屏。"""
+    """首帧过渡启动屏：银河渐变横幅（白名单 tui_boot_banner，fg 按行三停驻色）
+    + ASCII 星仔 + 标语；探活期间跑圈字符（#17）；成功入工作台，超时 5s 回壳层
+    换装壳内嵌连接面板（L14）。"""
 
     TIMEOUT_S = 5.0
 
@@ -71,7 +74,6 @@ class BootScreen(Screen):
 
     async def _probe(self) -> None:
         from tui.service_client import get_client
-        from tui.shell.connect import ConnectScreen
 
         deadline = time.monotonic() + self.TIMEOUT_S
         client = get_client()
@@ -82,7 +84,9 @@ class BootScreen(Screen):
                 if time.monotonic() >= deadline:
                     self._message_set("探活超时，转入连接引导…")
                     await asyncio.sleep(SPIN_INTERVAL_S * 2)
-                    self.app.switch_screen(ConnectScreen())
+                    # 先换装面板再 pop：pop 后本屏 worker 即被取消，顺序不可反
+                    await self.app.show_connect_panel()  # 连接态壳内嵌（L14）
+                    self.app.pop_screen()            # 回壳层露出连接面板
                     return
                 await asyncio.sleep(0.5)
                 continue

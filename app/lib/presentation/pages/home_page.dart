@@ -14,6 +14,7 @@ import '../../core/mascot/starling_view.dart';
 import '../../data/api_client/dio_client.dart';
 import '../shell/astro_shortcuts.dart';
 import '../widgets/instruction_card.dart';
+import '../widgets/sweep_ring.dart';
 
 /// 首页 = 对话式入口（Kimi 新会话式 · AstroForge 的品牌时刻，方案 §5.2）：
 /// 空态四元素淡入上移 stagger（星仔→问候→胶囊→输入条）；
@@ -360,7 +361,26 @@ class _HomePageState extends ConsumerState<HomePage> {
                           taskType: _instruction!['task_type'] as String? ?? '',
                           taskUuid: _instruction!['task_uuid'] as String? ?? '',
                           title: _instruction!['title'] as String? ?? '',
+                          params:
+                              (_instruction!['params'] as Map?)?.cast<String, dynamic>() ??
+                                  const {},
                           onViewHistory: () => context.go('/history'),
+                          // ✧ 去表单精调：预填参数跳任务页（L20 双钮之二）
+                          onRefine: () {
+                            ref.read(taskPrefillProvider.notifier).state =
+                                TaskPrefill(
+                              taskType:
+                                  _instruction!['task_type'] as String? ?? '',
+                              config: (_instruction!['params'] as Map?)
+                                      ?.cast<String, dynamic>() ??
+                                  const {},
+                              reason: '指令卡精调',
+                            );
+                            context.go('/tasks');
+                          },
+                          // onExecute 不传：服务端命中即建单（task_uuid 必在），
+                          // 卡片如实呈「已执行」态——创建路径仅「仅解析未建单」
+                          // 契约启用（见 InstructionCard 注释）
                         ),
                       ),
                     ],
@@ -510,7 +530,7 @@ class _CapabilityState extends State<_Capability> {
               Text(widget.glyph,
                   style: TextStyle(
                       color: _hover ? palette.ink900 : palette.ink600,
-                      fontSize: 13)),
+                      fontSize: AstroType.bodySm.size)),
               const SizedBox(width: 6),
               Text(
                 widget.label,
@@ -779,9 +799,15 @@ class _SendButton extends StatelessWidget {
   }
 }
 
-/// 引擎点火卡（UX P0：模型冷启动是独立仪式；进度不伪造——只报真实已等待时长）。
+/// 引擎点火卡（UX P0：模型冷启动是独立仪式；进度不伪造——只报真实已等待时长。
+/// M5 长时档 ETA：剩余按文档化冷启动经验上限 30s 倒推（§5.1 探测纪律：
+/// 「约 30s」即此值）；超 30s 转如实「仍在加载」；服务端 /v1/model/load
+/// 补 loaded_bytes 后可换 estimateBytesEta 字节口径——见 eta_estimator 承接说明）。
 class _IgnitionCard extends StatelessWidget {
   const _IgnitionCard({required this.elapsedS, required this.onCancel});
+
+  /// 文档化冷启动经验上限（home composer 提示「约 30s」同源，禁散落第二份）。
+  static const int expectedLoadS = 30;
 
   final int elapsedS;
   final VoidCallback onCancel;
@@ -789,6 +815,10 @@ class _IgnitionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AstroPaletteScope.of(context);
+    final remainingS = (expectedLoadS - elapsedS).clamp(0, expectedLoadS);
+    final etaText = remainingS > 10
+        ? '预计剩余 ≈${remainingS}s'
+        : '仍在加载 · 已等待 ${elapsedS}s';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -797,12 +827,23 @@ class _IgnitionCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(AstroIcons.aiThinking,
-              style: TextStyle(color: palette.nebula, fontSize: 14)),
+          // #17：探活期跑圈包裹星符（sweepGradient 高亮弧，1.2s/圈 dur-loop）
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const SweepRing(size: 20, strokeWidth: 1.8),
+                Text(AstroIcons.aiThinking,
+                    style: TextStyle(color: palette.nebula, fontSize: AstroType.label.size)),
+              ],
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '引擎点火 · qwen2b（常驻 · 日常指令）· 已等待 ${elapsedS}s · 预计 ≈30s',
+              '引擎点火 · qwen2b（常驻 · 日常指令）· $etaText',
               style: TextStyle(
                   fontSize: AstroType.bodySm.size, color: palette.ink900),
             ),
@@ -857,7 +898,7 @@ class _EnvBadge extends StatelessWidget {
             Text(
               allOk ? AstroIcons.navHome : AstroIcons.statusWarn,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AstroType.caption.size,
                 color: allOk ? palette.auroraText : palette.molten,
               ),
             ),
@@ -1092,7 +1133,7 @@ class _ConnectGuideState extends ConsumerState<_ConnectGuide> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: Text('·',
-                          style: TextStyle(color: palette.ink400, fontSize: 11)),
+                          style: TextStyle(color: palette.ink400, fontSize: AstroType.label.size)),
                     ),
                 ],
               ],
@@ -1107,10 +1148,11 @@ class _ConnectGuideState extends ConsumerState<_ConnectGuide> {
             FilledButton.icon(
               onPressed: _launching ? null : _launchService,
               icon: _launching
-                  ? SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                  // #17 边缘高亮跑圈：探活期循环位（sweepGradient 1.2s/圈）
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: SweepRing(size: 16, strokeWidth: 2.2),
                     )
                   : const Icon(LucideIcons.rocket, size: 16),
               label: Text(_launching ? '拉起中…' : '一键拉起服务'),

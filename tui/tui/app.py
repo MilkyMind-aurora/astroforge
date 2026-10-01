@@ -4,7 +4,7 @@
 壳只保留：导航/主题/面板/快捷键 + 共享监控态（V1-B.3 门禁：≤300 行）。
 - 页面全部由 tui/plugins/* 提供：内置 8 页 + entry_points 组 astroforge.tui_pages
   合并注册，config/design/pages.yaml 显隐/排序覆盖（方案 §2.4）；
-- 启动/连接屏、侧栏、状态栏、命令面板、后台轮询见 tui/shell/；
+- 启动过渡屏、壳内嵌连接面板、侧栏、状态栏、命令面板、后台轮询见 tui/shell/；
 - 星伴 AI 右抽屉与日志面板见 tui/panels/；任务进度卡/步骤时间线见 tui/components/。
 快捷键：1-8 切页（30ms 去抖）· / 命令面板 · Ctrl+Shift+A 或 A 星伴 · Ctrl+` 日志 ·
 f 文件浏览器 · q 退出。
@@ -27,9 +27,10 @@ from tui.plugins.monitor import MonitorState
 from tui.service_client import get_client
 from tui.shell.boot import BootScreen
 from tui.shell.commands import ForgeCommands
-from tui.shell.connect import ConnectScreen
+from tui.shell.connect import ConnectPanel
 from tui.shell.format import seg
 from tui.shell.loops import ServiceLoopsMixin
+from tui.shell.quote_card import QuoteCardScreen
 from tui.shell.sidebar import Sidebar
 from tui.shell.status_bar import StatusBar
 from tui.theme import astro_theme
@@ -89,6 +90,7 @@ class AstroForgeApp(ServiceLoopsMixin, App):
         self.health_data: dict | None = None
         self.env_items: list[dict] = []
         self.service_error: str | None = None
+        self.ai_state = "idle"  # AI 入口三态（闲/思/毕；抽屉写，侧栏读，L12）
         self._current_page = "home"
         self._last_nav = 0.0
         self._thresholds_loaded = False
@@ -195,6 +197,18 @@ class AstroForgeApp(ServiceLoopsMixin, App):
     def action_toggle_log(self) -> None:
         self.push_screen(LogPanelScreen(get_client()))
 
+    def action_mascot_quote(self) -> None:
+        """星仔彩蛋（侧栏 ☄ 行，L12）：弹语录卡（用户主动触发，不受 dispatch 限额）。"""
+        self.push_screen(QuoteCardScreen())
+
+    def set_ai_state(self, state: str) -> None:
+        """AI 入口三态（闲✵/思✶旋转帧/毕☄ 短亮）：星伴抽屉写入，侧栏渲染（L12）。"""
+        self.ai_state = state if state in ("idle", "thinking", "done") else "idle"
+        try:
+            self.query_one(Sidebar).set_ai_state(self.ai_state)
+        except Exception:
+            pass  # 侧栏未挂载（测试宿主/极早调用）
+
     def action_set_theme(self, name: str) -> None:
         """主题热切（§1.5）：refresh_css 瞬时生效；持久化经 app_settings（尽力）。"""
         if name not in design.THEMES:
@@ -204,14 +218,27 @@ class AstroForgeApp(ServiceLoopsMixin, App):
         self.notify(f"主题已切换：{name}", severity="information")
         self.run_worker(self._persist_theme(name), exclusive=True)
 
+    # ---- 连接态壳内嵌（L14）----
+    async def show_connect_panel(self) -> None:
+        """content 区换装 ConnectPanel（替代全屏 ConnectScreen 的壳内嵌连接态）。"""
+        content = self.query_one("#content", Vertical)
+        await content.remove_children()
+        await content.mount(ConnectPanel())
+
+    def restore_after_connect(self) -> None:
+        """探活成功（面板重试钮 / 健康自愈 / 「重连」命令共用）：撤面板重挂当前页。"""
+        if not self.query(ConnectPanel):
+            return
+        self.run_worker(self._mount_page(self.current_page_index),
+                        group="page-mount", exclusive=True)
+        self.notify("服务核心已恢复连接", severity="information")
+
     async def reconnect(self) -> None:
         try:
             await get_client().health()
         except Exception:
-            return  # 仍不可达，停留在引导屏
-        if isinstance(self.screen, ConnectScreen):
-            self.pop_screen()
-        self.notify("服务核心已恢复连接", severity="information")
+            return  # 仍不可达，维持壳内嵌连接面板
+        self.restore_after_connect()
 
 
 def main() -> None:

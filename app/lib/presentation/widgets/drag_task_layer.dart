@@ -124,7 +124,7 @@ class _DragTaskLayerState extends ConsumerState<DragTaskLayer> {
                         children: [
                           Text(AstroIcons.taskRunning,
                               style: TextStyle(
-                                  fontSize: 14, color: palette.aurora)),
+                                  fontSize: AstroType.body.size, color: palette.aurora)),
                           const SizedBox(width: 8),
                           Text('松手，锻成任务',
                               style: TextStyle(
@@ -317,7 +317,7 @@ class _DropConfirmDialogState extends ConsumerState<_DropConfirmDialog> {
                             ),
                           )
                         : Text(AstroIcons.taskSuccess,
-                            style: const TextStyle(fontSize: 13)),
+                            style: TextStyle(fontSize: AstroType.bodySm.size)),
                     label: Text(_submitting
                         ? '创建中…'
                         : '确认执行（${widget.specs.where((s) => s.selected).length}）'),
@@ -367,7 +367,7 @@ class _DropCard extends StatelessWidget {
               Checkbox(value: spec.selected, onChanged: (_) => onToggle()),
               const SizedBox(width: 4),
               Text(spec.glyph,
-                  style: TextStyle(fontSize: 14, color: palette.aurora)),
+                  style: TextStyle(fontSize: AstroType.body.size, color: palette.aurora)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

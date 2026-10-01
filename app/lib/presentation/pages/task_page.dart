@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/design/design.dart';
+import '../../core/eta/eta_estimator.dart';
 import '../../data/api_client/dio_client.dart';
 import '../../data/task_schema.dart';
 import '../widgets/context_actions.dart';
@@ -369,7 +370,7 @@ class _TaskPageState extends ConsumerState<TaskPage> {
                               AlwaysStoppedAnimation(palette.onAurora),
                         ),
                       )
-                    : Text(_spec.glyph, style: const TextStyle(fontSize: 14)),
+                    : Text(_spec.glyph, style: TextStyle(fontSize: AstroType.body.size)),
                 label: Text(_submitting
                     ? '提交中…'
                     : deprecated
@@ -712,7 +713,7 @@ class _EnvDegradeCard extends StatelessWidget {
       child: Row(
         children: [
           Text(AstroIcons.statusWarn,
-              style: TextStyle(fontSize: 14, color: palette.molten)),
+              style: TextStyle(fontSize: AstroType.body.size, color: palette.molten)),
           const SizedBox(width: AstroSpace.gapLg),
           Expanded(
             child: Column(
@@ -758,6 +759,15 @@ class _RecentRow extends StatelessWidget {
     final status = task['status'] as String? ?? 'pending';
     final (glyph, color) = statusVisual(status, palette);
     final uuid = task['task_uuid'] as String? ?? '';
+    // M5 ETA：运行中任务显示剩余时长（长时档 >10s；数据不足不显示）
+    final eta = status == 'running'
+        ? estimateTaskEta(
+            progress: (task['progress'] as num?)?.toInt() ?? 0,
+            startedAt: DateTime.tryParse(task['started_at'] as String? ?? ''),
+            now: DateTime.now(),
+          )
+        : null;
+    final etaSuffix = shouldShowEta(eta) ? ' · 剩余 ${formatEta(eta!)}' : '';
     return GestureDetector(
       onSecondaryTapUp: (details) => showTaskContextMenu(
         context,
@@ -778,7 +788,7 @@ class _RecentRow extends StatelessWidget {
                 fontSize: AstroType.bodySm.size, color: palette.ink900),
           ),
           subtitle: Text(
-            '进度 ${task['progress']}%',
+            '进度 ${task['progress']}%$etaSuffix',
             style: TextStyle(
                 fontSize: AstroType.caption.size, color: palette.ink600),
           ),

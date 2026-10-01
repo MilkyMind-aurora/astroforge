@@ -42,6 +42,7 @@ class ServiceLoopsMixin:
                 if not self._thresholds_loaded:
                     self._thresholds_loaded = True
                     await self._load_thresholds(client)
+                self.restore_after_connect()  # 连接面板自愈（探活自动重试位，L14）
             except Exception as exc:
                 self.service_error = str(exc)
             self._sync_health_ui()
@@ -99,6 +100,11 @@ class ServiceLoopsMixin:
                         continue
                     if msg.get("type") == "monitor":
                         self.monitor_state.ingest(msg.get("payload") or {})
+                    elif msg.get("type") == "alert":
+                        # L16：服务端 WS alert 事件（信封 {type:alert,
+                        # payload:{level,source,message,task_uuid?}}）→ 共享态，
+                        # 监控页实时入告警区（广播由 server 组实现）
+                        self.monitor_state.push_alert(msg.get("payload") or {})
                     elif msg.get("type") == "heartbeat":
                         self.monitor_state["updated_at"] = time.monotonic()
             except asyncio.CancelledError:

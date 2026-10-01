@@ -71,26 +71,50 @@ class _GrowInState extends State<GrowIn> with SingleTickerProviderStateMixin {
 }
 
 /// 指令卡：AI 指令解析命中后的生长式卡片（#12）。
-/// `「task_type 星符」→ 已创建 a3f8…`（§3.6/§5.6：服务端 REST/WS chat 命中
-/// instruction 时已直接建任务并回 task_uuid——卡片如实展示，不再伪造二次确认）。
+/// 双钮契约（终审 L20）：
+/// - 「✦ 执行」：确认创建任务——仅当服务端只解析未建单（taskUuid 空）时
+///   才可点（onExecute 建单）；服务端 REST/WS chat 命中即直接建单并回
+///   task_uuid（§3.6/§5.6 契约），此态按钮如实呈「已执行」，点击跳历史，
+///   禁伪造二次创建。
+/// - 「✧ 去表单精调」：跳任务页并预填 params（taskPrefillProvider 载荷）。
 class InstructionCard extends StatelessWidget {
   const InstructionCard({
     required this.taskType,
     required this.taskUuid,
     required this.title,
+    this.params = const {},
     this.onViewHistory,
+    this.onExecute,
+    this.onRefine,
+    this.executing = false,
     super.key,
   });
 
   final String taskType;
   final String taskUuid;
   final String title;
+
+  /// 解析出的参数（「去表单精调」预填载荷；空=无可预填项）。
+  final Map<String, dynamic> params;
   final VoidCallback? onViewHistory;
+
+  /// 确认创建任务（taskUuid 空时的「✦ 执行」动作）。
+  final VoidCallback? onExecute;
+
+  /// 跳任务页并预填参数（「✧ 去表单精调」动作）。
+  final VoidCallback? onRefine;
+
+  /// 执行中（onExecute 已发出，按钮 busy）。
+  final bool executing;
 
   @override
   Widget build(BuildContext context) {
     final palette = AstroPaletteScope.of(context);
+    // 主钮前景色走 ColorScheme（AstroTheme 由 palette 构建——token 路由，
+    // 夜档 onPrimaryContainer=aurora / 昼档=auroraText）
+    final onTonal = Theme.of(context).colorScheme.onPrimaryContainer;
     final short = taskUuid.length >= 8 ? taskUuid.substring(0, 8) : taskUuid;
+    final executed = taskUuid.isNotEmpty;
     return Material(
       color: palette.card,
       borderRadius: BorderRadius.circular(AstroRadius.md),
@@ -103,42 +127,105 @@ class InstructionCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(AstroRadius.md),
             border: Border.all(color: palette.stroke),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AstroIcons.taskRunning,
-                  style: TextStyle(color: palette.aurora, fontSize: 16)),
-              const SizedBox(width: AstroSpace.gapLg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$taskType → 已创建 $short',
-                      style: TextStyle(
-                        fontSize: AstroType.titleSm.size,
-                        fontWeight: FontWeight.w500,
-                        color: palette.ink900,
-                      ),
-                    ),
-                    if (title.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Text(AstroIcons.taskRunning,
+                      style: TextStyle(color: palette.aurora, fontSize: 16)),
+                  const SizedBox(width: AstroSpace.gapLg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          executed ? '$taskType → 已创建 $short' : taskType,
                           style: TextStyle(
-                            fontSize: AstroType.bodySm.size,
-                            color: palette.ink600,
+                            fontSize: AstroType.titleSm.size,
+                            fontWeight: FontWeight.w500,
+                            color: palette.ink900,
                           ),
                         ),
-                      ),
-                  ],
-                ),
+                        if (title.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AstroType.bodySm.size,
+                                color: palette.ink600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    AstroIcons.miscCaretRight,
+                    style: TextStyle(color: palette.ink400, fontSize: AstroType.caption.size),
+                  ),
+                ],
               ),
-              Text(
-                AstroIcons.miscCaretRight,
-                style: TextStyle(color: palette.ink400, fontSize: 12),
+              const SizedBox(height: AstroSpace.gap),
+              // 双钮行（L20）：主钮随执行态换语义；副钮恒为「去表单精调」
+              Row(
+                children: [
+                  if (executed)
+                    FilledButton.tonalIcon(
+                      onPressed: onViewHistory,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      icon: Text(
+                        AstroIcons.miscStarRank1,
+                        style: TextStyle(fontSize: AstroType.caption.size, color: onTonal),
+                      ),
+                      label: const Text('已执行 · 查看进度'),
+                    )
+                  else
+                    FilledButton.tonalIcon(
+                      onPressed: executing ? null : onExecute,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      icon: executing
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(onTonal),
+                              ),
+                            )
+                          : Text(
+                              AstroIcons.miscStarRank1,
+                              style: TextStyle(fontSize: AstroType.caption.size, color: onTonal),
+                            ),
+                      label: Text(executing ? '创建中…' : '执行'),
+                    ),
+                  const SizedBox(width: AstroSpace.gap),
+                  if (onRefine != null)
+                    OutlinedButton.icon(
+                      onPressed: onRefine,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      // 星符取自 AstroIcons（icons.yaml 语义名，禁散落字符）
+                      icon: Text(AstroIcons.statusHint,
+                          style: TextStyle(
+                              fontSize: AstroType.caption.size, color: palette.ink600)),
+                      label: Text('去表单精调',
+                          style: TextStyle(
+                              fontSize: AstroType.bodySm.size,
+                              color: palette.ink600)),
+                    ),
+                ],
               ),
             ],
           ),

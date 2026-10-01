@@ -68,12 +68,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -120,12 +120,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -171,12 +171,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -223,12 +223,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -275,12 +275,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -327,12 +327,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -400,12 +400,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -461,12 +461,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -565,12 +565,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -625,12 +625,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -685,12 +685,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -745,12 +745,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -815,12 +815,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -875,12 +875,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -946,12 +946,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -997,12 +997,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1056,12 +1056,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1126,12 +1126,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1177,12 +1177,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1237,12 +1237,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1298,12 +1298,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1358,12 +1358,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1414,12 +1414,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1475,12 +1475,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1536,12 +1536,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1587,12 +1587,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1647,12 +1647,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1698,12 +1698,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1760,12 +1760,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "参数校验失败：HTTP 400 + 统一信封 code=1001（MISSING_PARAM，1xxx 参数段）",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -1836,19 +1836,6 @@
         ],
         "title": "CreateTaskBody"
       },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
       "ModelSwitchBody": {
         "properties": {
           "model_key": {
@@ -1898,45 +1885,31 @@
         ],
         "title": "SavePipelineBody"
       },
-      "ValidationError": {
+      "ErrorEnvelope": {
+        "title": "ErrorEnvelope",
+        "description": "统一响应信封（方案 3.8）。code 错误码分段：0 成功 | 1xxx 参数（1001 参数校验失败 / 1002 路径非法 / 1003 模板非法 / 1004 YAML 非法）| 2xxx 服务 | 3xxx 模块执行 | 4xxx 资源。",
+        "type": "object",
         "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "错误码分段：0 成功，1xxx 参数，2xxx 服务，3xxx 模块执行，4xxx 资源",
+            "examples": [
+              1001
+            ]
           },
-          "msg": {
+          "message": {
             "type": "string",
             "title": "Message"
           },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
+          "data": {
+            "title": "Data"
           }
         },
-        "type": "object",
         "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
+          "code",
+          "message"
+        ]
       }
     }
   }

@@ -203,6 +203,35 @@ class RefreshEvents extends ChangeNotifier {
 final refreshEventsProvider =
     ChangeNotifierProvider<RefreshEvents>((ref) => RefreshEvents());
 
+/// 任务完成广播（§1.8 #18 极光横幅信号源）：WS status 事件确认任务迁移到
+/// success 时由历史页/流水线页发布；壳层监听并弹出极光横幅。
+/// uuid 去重：同一任务只庆祝一次（续跑后再次完成视为新完成）。
+class TaskCompletion {
+  const TaskCompletion({required this.taskUuid, required this.title});
+
+  final String taskUuid;
+  final String title;
+}
+
+class TaskCompletions extends ChangeNotifier {
+  final _recentUuids = <String>{};
+  TaskCompletion? _latest;
+
+  TaskCompletion? get latest => _latest;
+
+  void announce({required String taskUuid, required String title}) {
+    if (!_recentUuids.add(taskUuid)) return;
+    if (_recentUuids.length > 200) {
+      _recentUuids.remove(_recentUuids.first);
+    }
+    _latest = TaskCompletion(taskUuid: taskUuid, title: title);
+    notifyListeners();
+  }
+}
+
+final taskCompletionsProvider =
+    ChangeNotifierProvider<TaskCompletions>((ref) => TaskCompletions());
+
 /// 拖拽/能力胶囊 → 任务页预填（「去表单精调」非死胡同，UX P1-2）。
 /// 载荷：{task_type, config(部分预填), reason}；任务页 initState 消费一次即清。
 class TaskPrefill {

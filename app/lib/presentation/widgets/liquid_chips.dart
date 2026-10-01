@@ -220,7 +220,7 @@ class _ChipState extends State<_Chip> {
                 children: [
                   Text(
                     widget.item.glyph,
-                    style: TextStyle(fontSize: 13, color: color),
+                    style: TextStyle(fontSize: AstroType.bodySm.size, color: color),
                   ),
                   const SizedBox(width: 6),
                   Text(

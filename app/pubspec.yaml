@@ -32,6 +32,11 @@ dependencies:
   # 监控实时曲线
   fl_chart: ^1.2.0
 
+  # 星伴 AI 回复 Markdown 渲染 + 代码高亮（终审 L19/L23；代码块配色经
+  # PreConfig.theme 传 flutter_highlight 主题映射，本库不散落色值）
+  markdown_widget: ^2.3.2
+  flutter_highlight: ^0.7.0
+
   # 桌面集成：窗口尺寸记忆 / 最小尺寸 / 标题
   window_manager: ^0.5.2
 
@@ -53,6 +58,18 @@ flutter:
   assets:
     - assets/design/starfield/seed.json
     - assets/design/quotes.yaml
+
+  # mono 字族打包（终审 L26：JetBrainsMono latin，OFL 1.1 许可见
+  # assets/fonts/LICENSE-JetBrainsMono-OFL.txt）；正文 CJK 跟随系统
+  # 字体回退链（桌面端系统自带，不打包大体积 CJK 字库）。
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
 
   # 星野 fragment shader（方案 §1.5 / 星空设计系统规格 §五：uTime/uSeed/uDensity 参数化）
   shaders:

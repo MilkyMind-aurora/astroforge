@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""筛选 chips 胶囊组（方案 §1.8 #7 组件规格 / §3.5 状态筛选）。
+"""筛选 chips 胶囊组（方案 §1.8 #7 组件规格 / §3.5 状态筛选 / L17 统一胶囊族）。
 
-selected=chipsSelectedBg 底 + aurora 字（夜档强调色文本图形双用，规格 v1 §一）；
-未选=container 底 + ink-600。TUI 无共享指示层，不做液态滑移（#3 属 Flutter
-监控页），选中态切换走 T_PRESS 档内的瞬时反馈。
+selected=aurora 实底 + onAurora 深字（L17 统一裁定；tokens 硬规则「aurora 底
+一律深字，禁白字」）；未选=container 底 + ink-600。TUI 无共享指示层，不做液态
+滑移（#3 属 Flutter 监控页），选中态切换走 T_PRESS 档内的瞬时反馈。
+ChipAction 为同族动作胶囊（快捷入口等无选中态的动作位），形态与 ChipBar 统一。
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ class ChipBar(Horizontal):
     ChipBar .chip { min-width: 8; height: 3; margin-right: 1; border: none;
         background: $container; color: $ink-600; text-align: center; }
     ChipBar .chip:hover { background: $containerPressed; color: $ink-900; }
-    ChipBar .chip.selected { background: $chipsSelectedBg; color: $aurora;
+    ChipBar .chip.selected { background: $aurora; color: $onAurora;
         text-style: bold; }
     """
 
@@ -56,3 +57,14 @@ class ChipBar(Horizontal):
         for i, button in enumerate(self.query(Button)):
             button.set_class(self._options[i][0] == value, "selected")
         self.post_message(self.Changed(self, value))
+
+
+class ChipAction(Button):
+    """胶囊动作 chip（首页快捷入口等动作位）：无选中态，胶囊形态与 ChipBar 统一。"""
+
+    DEFAULT_CSS = """
+    ChipAction { min-width: 8; height: 3; margin-right: 1; border: none;
+        background: $container; color: $ink-600; text-align: center; }
+    ChipAction:hover { background: $containerPressed; color: $ink-900; }
+    ChipAction:focus { background: $containerPressed; color: $ink-900; }
+    """

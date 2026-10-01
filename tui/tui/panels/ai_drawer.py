@@ -246,6 +246,7 @@ class AiDrawerScreen(Screen):
         self._busy = True
         self._buffer = ""
         self._write_user(message)
+        self._set_ai_state("thinking")  # 侧栏 AI 入口：思✶旋转帧（L12）
         think.add_class("thinking-on")
         think_timer = self.set_interval(THINK_INTERVAL_S, self._cycle_think)
         flush = self.set_interval(STREAM_FLUSH_S, self._flush)
@@ -276,6 +277,7 @@ class AiDrawerScreen(Screen):
                         self._drain_buffer(log_widget)
                         self.conversation_id = payload.get("conversation_id")
                         think.remove_class("thinking-on")
+                        self._set_ai_state("done")  # 毕☄ 短亮（L12）
                         status.update("")
                         await self._render_done(log_widget, payload)
                         return
@@ -284,9 +286,11 @@ class AiDrawerScreen(Screen):
                         think_timer.stop()
                         self._drain_buffer(log_widget)
                         think.remove_class("thinking-on")
+                        self._set_ai_state("idle")
                         message_text = str(payload.get("message", "引擎错误"))
                         log_widget.write(Text(
-                            f"✕ {message_text}", style=_theme_token(self.app, "nova")))
+                            f"{design.icon('status.error')} {message_text}",
+                            style=_theme_token(self.app, "nova")))
                         status.update("")
                         return
         except Exception as exc:
@@ -294,8 +298,10 @@ class AiDrawerScreen(Screen):
             think_timer.stop()
             self._drain_buffer(log_widget)
             think.remove_class("thinking-on")
+            self._set_ai_state("idle")
             log_widget.write(Text(
-                f"✕ 流式通道失败：{exc}", style=_theme_token(self.app, "nova")))
+                f"{design.icon('status.error')} 流式通道失败：{exc}",
+                style=_theme_token(self.app, "nova")))
             status.update("")
         finally:
             self._busy = False
@@ -353,5 +359,12 @@ class AiDrawerScreen(Screen):
         await asyncio.sleep(GROW_STEP_S * len(lines))
         self.query_one("#ai-followups", Horizontal).add_class("followups-on")
 
+    def _set_ai_state(self, state: str) -> None:
+        """同步侧栏 AI 入口三态（闲/思/毕，L12；宿主无该方法时静默跳过）。"""
+        setter = getattr(self.app, "set_ai_state", None)
+        if setter is not None:
+            setter(state)
+
     def action_dismiss_panel(self) -> None:
+        self._set_ai_state("idle")
         self.dismiss()

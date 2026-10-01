@@ -2,14 +2,18 @@
 """前端聚合验收（方案 §七「全局验收工具链」/ V1-B.5）：一次跑完设计契约门禁。
 
 检查项（默认集）：
-  pytest          python -m pytest server/tests -q（与 CI Python 门同范围；
-                  根 tests/ 属模块功能测试，依赖 cv2/numpy 等模块环境，另行跑）
-  ruff            python -m ruff check server scripts（与 CI 同范围）
-  gen-idempotent  gen_design 连跑两次：产物字节不变 + git 工作树无新增变化
-  placeholder     tui/ 内 "PlaceholderPage" 出现次数 = 0（占位页清零，§3.7 ②）
-  bare-color      tui/ 非生成目录裸 hex（#RRGGBB）= 0（裸色只许在生成物，§3.7 ①）
-  bare-print      modules/*/cli.py 裸 print( = 0（stdout 契约走 star_console/cli_utils，§4.2 ①）
-  app-bare-color  app/lib 除 tokens.g.dart 外 "Color(0x" = 0（§5.8 ②）
+  pytest            python -m pytest tests -q（仓库根全量，与 CI「根目录功能测试」同范围，
+                    含 TUI 插件注册冒烟 test_tui_mf2；依赖 cv2/numpy/textual 等模块环境）
+  ruff              python -m ruff check server scripts（与 CI 同范围）
+  gen-idempotent    gen_design 连跑两次：产物字节不变 + git 工作树无新增变化
+  screenshots-check docs/design/screenshots/ 双主题截图清单核对（Flutter 5 页×双主题
+                    + TUI 双主题，§5.8 门禁④；缺失即 FAIL 并列出缺哪些）
+  placeholder       tui/ 内 "PlaceholderPage" 出现次数 = 0（占位页清零，§3.7 ②）
+  bare-color        tui/ 非生成目录裸 hex（#RRGGBB/#AARRGGBB）= 0（裸色只许在生成物，§3.7 ①）
+  focus-aurora      tui 聚焦盒描边断言：:focus/border-active 一律引用 $border-active/
+                    $aurora 生成变量，禁裸色，且生成物 .border-active=$aurora（§3.7 ⑦）
+  bare-print        modules/*/cli.py 裸 print( = 0（stdout 契约走 star_console/cli_utils，§4.2 ①）
+  app-bare-color    app/lib 除 tokens.g.dart 外 "Color(0x" = 0（§5.8 ②）
 
 --full 追加（需 Flutter 工具链）：
   flutter-analyze flutter analyze（cwd=app）
@@ -25,8 +29,9 @@
 --quick（契约快检，供编排/本地快速门禁）：跳过重量级检查（pytest、
 flutter-analyze、flutter-test）与随里程碑推进的清账项（placeholder、
 bare-color——TUI 壳层 token 化重写前的已知债，豁免口径与 CI 设计契约
-门禁一致），只跑 ruff / gen-idempotent / bare-print / app-bare-color。
-默认集与 --full 仍全量执行（含上述清账项），MF1 TUI 重写后清账项归零。
+门禁一致），只跑 ruff / gen-idempotent / screenshots-check / focus-aurora
+/ bare-print / app-bare-color。默认集与 --full 仍全量执行（含上述清账项），
+MF1 TUI 重写后清账项归零。
 
 退出码即结论：0=全绿 1=存在 FAIL 2=参数错误。SKIP 不影响退出码（--skip/--quick 显式免责）。
 """
@@ -46,8 +51,19 @@ sys.path.insert(0, str(REPO_ROOT / "modules" / "_shared"))
 from star_console import banner, log, result_card  # noqa: E402  # 星幕输出（MF3 §4.1）：TTY 富文本/管道纯文本
 
 GEN_DIR = REPO_ROOT / "tui" / "tui" / "theme" / "generated"  # 裸色豁免目录（tokens 生成物）
-HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
+# 裸色判定（§3.7 ①）：#RRGGBB 与 #AARRGGBB 双形态都算裸色（8 位先于 6 位匹配，
+# 防止 #AARRGGBB 被截成 6 位前缀漏检；\b 防止吃进更长 token）。
+HEX_RE = re.compile(r"#[0-9A-Fa-f]{8}\b|#[0-9A-Fa-f]{6}\b")
 MAX_HITS_SHOWN = 8
+
+# 双主题截图清单（§5.8 门禁④）：Flutter 桌面端 5 个 IA 目的地 × 深空/晨昏双主题
+# （golden 冻结帧，见 docs/design/screenshots/README.md）+ TUI 端双主题截图。
+# TUI 命名约定：tui_<主题>.png（与 Flutter <主题>_<页>.png 同「主题前缀」口径）。
+SCREENSHOT_PAGES = ("home", "tasks", "pipeline", "history", "settings")
+SCREENSHOT_THEMES = ("dark", "light")
+EXPECTED_SCREENSHOTS = tuple(
+    f"{theme}_{page}.png" for theme in SCREENSHOT_THEMES for page in SCREENSHOT_PAGES
+) + ("tui_dark.png", "tui_light.png")
 
 # 检查项注册表：名称 → (说明, 执行函数)。函数返回 (ok|None, note)；
 # None = 无法执行（如 git 不可用），按 SKIP 计。
@@ -89,9 +105,9 @@ def _scan_files(root: Path, patterns: tuple[str, ...], exclude_dirs: tuple[Path,
 # 检查项实现
 # ============================================================
 
-@register("pytest", "python -m pytest server/tests -q（CI 同范围）")
+@register("pytest", "python -m pytest tests -q（仓库根全量，含 TUI 注册冒烟；CI 同范围）")
 def check_pytest() -> tuple[bool | None, str]:
-    proc = _run([sys.executable, "-m", "pytest", "server/tests", "-q"])
+    proc = _run([sys.executable, "-m", "pytest", "tests", "-q"])
     note = _tail(proc.stdout or proc.stderr)
     return proc.returncode == 0, note
 
@@ -144,6 +160,18 @@ def check_gen_idempotent() -> tuple[bool | None, str]:
     return True, f"{n} 项产物两次生成字节一致（{via_git}）"
 
 
+@register(
+    "screenshots-check",
+    "docs/design/screenshots/ 双主题截图清单核对（Flutter 5 页×双主题 + TUI 双主题，§5.8 ④）",
+)
+def check_screenshots() -> tuple[bool | None, str]:
+    shots_dir = REPO_ROOT / "docs" / "design" / "screenshots"
+    missing = [name for name in EXPECTED_SCREENSHOTS if not (shots_dir / name).is_file()]
+    if missing:
+        return False, f"缺 {len(missing)}/{len(EXPECTED_SCREENSHOTS)} 张: {missing[:MAX_HITS_SHOWN]}"
+    return True, f"{len(EXPECTED_SCREENSHOTS)} 张齐全（Flutter 5 页×双主题 + TUI 双主题）"
+
+
 @register("placeholder", "tui/ 内 PlaceholderPage = 0（占位页清零，§3.7 ②）")
 def check_placeholder() -> tuple[bool | None, str]:
     hits: list[str] = []
@@ -168,6 +196,42 @@ def check_bare_color() -> tuple[bool | None, str]:
     if hits:
         return False, f"{len(hits)} 处命中: {hits[:MAX_HITS_SHOWN]}"
     return True, "0 命中"
+
+
+@register(
+    "focus-aurora",
+    "tui 聚焦盒描边必须引用 $border-active/$aurora 生成变量、禁裸色（§3.7 ⑦）",
+)
+def check_focus_aurora() -> tuple[bool | None, str]:
+    violations: list[str] = []
+    focus_var_hits = 0
+    for path in _scan_files(REPO_ROOT / "tui", ("*.py", "*.tcss"), (GEN_DIR,)):
+        rel = path.relative_to(REPO_ROOT)
+        for lineno, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if ":focus" not in line and "$border-active" not in line:
+                continue
+            where = f"{rel}:{lineno}"
+            if HEX_RE.search(line):
+                violations.append(f"{where} 聚焦/描边行裸色")
+            elif "border" in line and not ("$border-active" in line or "$aurora" in line):
+                violations.append(f"{where} 聚焦盒 border 未引用 aurora 生成变量")
+            elif "$border-active" in line or "$aurora" in line:
+                focus_var_hits += 1
+    # 生成物侧链条收口：.border-active 工具类必须落在 $aurora（tui.border_levels.active=aurora）
+    active_line = next(
+        (ln for ln in (GEN_DIR / "tokens.tcss").read_text(encoding="utf-8").splitlines()
+         if ln.lstrip().startswith(".border-active")),
+        None,
+    )
+    if active_line is None or "$aurora" not in active_line:
+        violations.append(
+            f"tui/tui/theme/generated/tokens.tcss .border-active 未引用 $aurora: {active_line!r}"
+        )
+    if not focus_var_hits:
+        violations.append("tui 源码无任何 $border-active/$aurora 聚焦描边引用（断言面失效）")
+    if violations:
+        return False, f"{len(violations)} 处违规: {violations[:MAX_HITS_SHOWN]}"
+    return True, f"{focus_var_hits} 处聚焦描边均引用 $border-active/$aurora，.border-active=$aurora"
 
 
 @register("bare-print", "modules/*/cli.py 裸 print( = 0（stdout 契约，§4.2 ①）")

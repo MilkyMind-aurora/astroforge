@@ -1,0 +1,10 @@
+JetBrains Mono（打包于 app/assets/fonts/）
+Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+
+本字体以 SIL Open Font License, Version 1.1 授权发布：
+- 任何用途（含商用/再分发/嵌入软件）均可自由使用、复制与分发；
+- 不得单独出售字体文件本身；
+- 再分发时须保留本授权声明与版权声明（Reserved Font Name: JetBrains Mono）。
+
+授权全文见 https://scripts.sil.org/OFL 。
+来源：JetBrains IDE 发行包（jbr/lib/fonts/JetBrainsMono-*.ttf），未做修改。

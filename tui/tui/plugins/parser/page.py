@@ -17,6 +17,7 @@ from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Button, Input, RadioButton, RadioSet, Static, Switch
 
+from tui.components.env_gate import GATE_INTERVAL_S, EnvGateMixin
 from tui.components.task_card import TaskProgressCard
 from tui.service_client import ServiceClient
 from tui.theme.generated import tokens as design
@@ -25,10 +26,12 @@ MINERU_TAB, WPD_TAB = "MinerU 文档解析", "WPD 图表数值提取"
 _AXIS_KEYS = ("x_min", "x_max", "y_min", "y_max")
 
 
-class ParserPage(VerticalScroll):
+class ParserPage(VerticalScroll, EnvGateMixin):
     """解析中心：MinerU / WPD 双 Tab 表单 + 任务进度卡。"""
 
     BINDINGS = [Binding("f", "pick_path", "选路径")]
+    GATE_DISABLE = ("#par-input", "#par-threads", "#par-axis-switch",
+                    "#par-append", "#par-run")
 
     CSS = """
     #par-form { border: round $border-subtle; background: $card; padding: 0 2;
@@ -77,6 +80,8 @@ class ParserPage(VerticalScroll):
         yield Static("", id="par-result")
 
     def on_mount(self) -> None:
+        self.set_interval(GATE_INTERVAL_S, self.apply_env_gate)  # L9② 环境门禁
+        self.call_later(self.apply_env_gate)  # 首查（异步门禁）
         self._sync_tab()
 
     # ---- Tab 切换与预览 ----

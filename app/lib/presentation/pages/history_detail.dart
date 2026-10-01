@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/design/design.dart';
+import '../../core/eta/eta_estimator.dart';
 import '../../data/api_client/dio_client.dart';
 import '../../data/ws_client/ws_client.dart';
 import '../widgets/context_actions.dart';
@@ -154,6 +155,15 @@ class _TaskDetailViewState extends ConsumerState<TaskDetailView> {
     final steps = (task['steps'] as List?) ?? const [];
     final canRetry = status == 'failed' || status == 'canceled';
     final canCancel = status == 'pending' || status == 'running';
+    // M5 ETA：运行中任务的剩余时长（progress 速率/步骤均耗时折算；>10s 才显示）
+    final eta = status == 'running'
+        ? estimateTaskEta(
+            progress: (task['progress'] as num?)?.toInt() ?? 0,
+            startedAt: DateTime.tryParse(task['started_at'] as String? ?? ''),
+            now: DateTime.now(),
+            steps: steps,
+          )
+        : null;
 
     return ListView(
       padding: const EdgeInsets.all(AstroSpace.section),
@@ -170,7 +180,7 @@ class _TaskDetailViewState extends ConsumerState<TaskDetailView> {
               ),
               child: Center(
                   child:
-                      Text(glyph, style: TextStyle(fontSize: 13, color: color))),
+                      Text(glyph, style: TextStyle(fontSize: AstroType.bodySm.size, color: color))),
             ),
             const SizedBox(width: AstroSpace.gapLg),
             Expanded(
@@ -210,6 +220,20 @@ class _TaskDetailViewState extends ConsumerState<TaskDetailView> {
             valueColor: AlwaysStoppedAnimation(palette.aurora),
           ),
         ),
+        // M5 长时档 ETA：估算口径如实标注（匀速外推）；不可估不显示
+        if (shouldShowEta(eta))
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '预计剩余 ${formatEta(eta!)}（按进度速率折算）',
+              style: TextStyle(
+                fontFamily: AstroType.monoFamily,
+                fontSize: AstroType.caption.size,
+                color: palette.ink600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
         if (task['error_message'] != null) ...[
           const SizedBox(height: AstroSpace.gap),
           Text('${task['error_code'] ?? ''} ${task['error_message']}',
@@ -283,7 +307,7 @@ class _TaskDetailViewState extends ConsumerState<TaskDetailView> {
           Card(
             child: ListTile(
               leading: Text(AstroIcons.miscStarMid,
-                  style: TextStyle(color: palette.ink600, fontSize: 14)),
+                  style: TextStyle(color: palette.ink600, fontSize: AstroType.body.size)),
               title: Text(outputDir,
                   style: TextStyle(
                       fontFamily: AstroType.monoFamily,

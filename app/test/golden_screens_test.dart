@@ -6,25 +6,27 @@
 // （星野 Canvas 直绘 seed.json 坐标、uTime=0；星仔 sampleStarling(t=0) 单帧），
 // 错峰入场/光晕呼吸全部瞬时到位，输出与运行时刻无关 → 像素级可复现。
 //
-// 契约纪律：5 个 IA 页面与壳层组件全部用真实实现；harness 只在两处与本机
-// 测试环境绑定，均如实声明：
-// ①字体：flutter_test 默认 Ahem 方块字，这里从本机字体注册金测族（CJK 主字 +
-//   星符 fallback 族 + mono 顶替）；生产端正文跟随系统 CJK、mono 打包
-//   JetBrainsMono 子集（pubspec 当前尚未打包——已知债，见 MF6 notes）。
+// 契约纪律：5 个 IA 页面与壳层组件全部用真实实现；harness 只在一处与测试
+// 环境绑定，如实声明：
+// ①字体（终审 L26 改造后）：全部改用「应用打包字体」——mono 为 pubspec 打包
+//   的 JetBrainsMono latin（rootBundle 装载，字节级跨平台一致）；正文 CJK 与
+//   星符【差异声明】：金测环境刻意不绑本机系统字体（Windows msyh / Segoe UI
+//   Symbol 已移除），CJK/星符字形回落测试引擎缺省 Ahem 方块占位——各平台
+//   渲染字节一致（跨平台比对可过），代价是基线截图里 CJK/星符为方块形态；
+//   生产端不受影响：正文跟随系统 CJK、星符走系统字体回退链、mono 走打包
+//   JetBrainsMono（fonts 声明见 pubspec）。
 // ②数据：apiClientProvider 注入 FakeApiClient（离线金测环境，无服务进程）；
 //   connectionProvider 注入未连接的 ForgeWebSocket（app_providers 的测试缝），
 //   仪表胶囊显示「重连中」+ 最后已知采样——禁伪造「已连接」。
 //
-// 再生成（本机 Windows）：
+// 再生成（任意平台，产物一致）：
 //   cd app && flutter test --update-goldens test/golden_screens_test.dart
-// 校验（无 --update-goldens 时逐字节比对；非 Windows 跳过——字体基线绑 Windows）：
+// 校验（无 --update-goldens 时逐字节比对；跨平台可比——字体全部为打包字节）：
 //   cd app && flutter test test/golden_screens_test.dart
 // 产物落盘：docs/design/screenshots/<dark|light>_<screen>.png
 //
 // 确定性纪律：FakeApiClient 的时间戳必须距今 >24h——历史卡相对时刻标签
 // 按「N 天前」天粒度变化（_relativeTime 用 DateTime.now()），24h 内稳定。
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +39,8 @@ import 'package:astroforge/core/router.dart';
 import 'package:astroforge/data/api_client/dio_client.dart';
 import 'package:astroforge/data/ws_client/ws_client.dart';
 
-/// 金测字体族：本机注册名，与生产字体族名隔离（禁污染生产 fontFamily）。
+/// 金测字体族：显式注册名（正文/星符兜底族全部映射到打包 JetBrainsMono
+/// 字节；CJK/星符缺字回落 Ahem——跨平台一致的方块占位，见文件头差异声明）。
 const String _kGoldenCjk = 'AstroGoldenCjk';
 const String _kGoldenSymbol = 'AstroGoldenSymbol';
 
@@ -49,12 +52,6 @@ void main() {
   setUpAll(() async {
     await loadGoldenFonts();
   });
-
-  // 基线在 Windows 生成（CJK/mono/星符字形绑定本机字体集）；跨平台逐字节
-  // 比对必挂——其他平台跳过比对，再生成仍走 --update-goldens（诚实降级）。
-  final platformSkip = Platform.isWindows
-      ? null
-      : 'golden 基线由 Windows 生成（字体渲染存在平台差异）';
 
   for (final mode in [ThemeMode.dark, ThemeMode.light]) {
     final prefix = mode == ThemeMode.dark ? 'dark' : 'light';
@@ -68,12 +65,6 @@ void main() {
       testWidgets(
         '双主题截图 $prefix $screen（uTime=0 冻结帧）',
         (WidgetTester tester) async {
-          if (!Platform.isWindows) {
-            // 保留跳过原因（testWidgets 的 skip 只收 bool）：
-            // golden 基线由 Windows 生成，其他平台仅支持 --update-goldens 再生成。
-            markTestSkipped(platformSkip!);
-            return;
-          }
           final overrides = <Override>[
             // 离线金测数据源（FakeApiClient：env-check 9/9、引擎可达、终态任务）
             apiClientProvider.overrideWith((ref) => FakeApiClient()),
@@ -185,48 +176,36 @@ ThemeData withGoldenFonts(ThemeData base) {
 }
 
 // ============================================================
-// 金测字体注册（本机字体 → FontLoader；替代 Ahem 方块字）
+// 金测字体注册（全部来自应用打包字体 → FontLoader；禁本机系统字体）
 // ============================================================
 
 /// 供金测复用（调试测试）单独调用。
+///
+/// L26 改造：仅装载 pubspec 打包的 JetBrainsMono（latin）字节，注册到
+/// 生产族名 + 金测兜底族名；CJK/星符缺字统一回落 Ahem 方块——各平台
+/// 字节一致（差异声明见文件头①）。
 Future<void> loadGoldenFonts() async {
-  // CJK 主字：微软雅黑（最接近生产「正文跟随系统 CJK」的 Windows 形态），
-  // 等线 TTF 兜底（单面 TTF，FontLoader 必可载）。
-  var ok = await _loadFamily(_kGoldenCjk, const [
-    'C:/Windows/Fonts/msyh.ttc',
-    'C:/Windows/Fonts/msyhbd.ttc',
-  ]);
-  if (!ok) {
-    ok = await _loadFamily(_kGoldenCjk, const [
-      'C:/Windows/Fonts/Deng.ttf',
-      'C:/Windows/Fonts/Dengb.ttf',
-    ]);
-  }
-  if (!ok) {
-    fail('金测字体不可用：未找到 msyh/Deng（截图会退化成 Ahem 方块字，拒绝产出）');
-  }
+  // 打包 mono（生产族名）：Regular/Medium/Bold 三字重与 pubspec fonts 声明同源
+  final monoData = <ByteData>[
+    await rootBundle.load('assets/fonts/JetBrainsMono-Regular.ttf'),
+    await rootBundle.load('assets/fonts/JetBrainsMono-Medium.ttf'),
+    await rootBundle.load('assets/fonts/JetBrainsMono-Bold.ttf'),
+  ];
 
-  // 星符/几何符号 fallback：Segoe UI Symbol（icons.yaml 星符全集承载字体；
-  // 生产端由 Windows 字体回退链天然命中，测试端需显式注册）。
-  await _loadFamily(_kGoldenSymbol, const ['C:/Windows/Fonts/seguisym.ttf']);
+  // 生产 mono 族名（AstroType.monoFamily='JetBrainsMono'）：真实打包字形，
+  // tabular 数字按生产等宽渲染。
+  await _loadFamilyBytes(AstroType.monoFamily, monoData);
 
-  // mono 顶替：生产 mono_family=JetBrainsMono（pubspec 尚未打包——债），
-  // 金测把 Consolas 注册到该族名下，tabular 数字按真实等宽渲染。
-  await _loadFamily(AstroType.monoFamily, const [
-    'C:/Windows/Fonts/consola.ttf',
-    'C:/Windows/Fonts/consolab.ttf',
-  ]);
-
-  // 默认族名兜底：部分 Material 子树（OpenContainer 闭态 Material、ChoiceChip、
-  // 无 family 的星符 Text）不走 textTheme.apply 出来的字体族——显式 family 的
-  // 回落到 'Roboto'，空 family 的回落到测试引擎缺省 'Ahem'。把 CJK + 星符字体
-  // 注册到这两个族名下，等价于生产端「系统字体回退链」行为；仅测试环境生效。
-  for (final family in const ['Roboto', 'Ahem']) {
-    await _loadFamily(family, const [
-      'C:/Windows/Fonts/msyh.ttc',
-      'C:/Windows/Fonts/msyhbd.ttc',
-      'C:/Windows/Fonts/seguisym.ttf',
-    ]);
+  // 金测兜底族名：textTheme.apply 出来的 CJK/星符族 + Material 默认
+  // 'Roboto' 与引擎缺省 'Ahem'——全部挂打包 mono 字节；latin/数字按
+  // JetBrainsMono 渲染，CJK/星符缺字回落方块（跨平台一致占位）。
+  for (final family in const [
+    _kGoldenCjk,
+    _kGoldenSymbol,
+    'Roboto',
+    'Ahem',
+  ]) {
+    await _loadFamilyBytes(family, monoData);
   }
 
   // lucide 图标字体（包内 font 声明在测试引擎下以包限定族名注册才生效——
@@ -243,19 +222,12 @@ Future<void> loadGoldenFonts() async {
   }
 }
 
-Future<bool> _loadFamily(String family, List<String> paths) async {
+Future<void> _loadFamilyBytes(String family, List<ByteData> fonts) async {
   final loader = FontLoader(family);
-  var count = 0;
-  for (final path in paths) {
-    final file = File(path);
-    if (!file.existsSync()) continue;
-    final bytes = file.readAsBytesSync();
-    loader.addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
-    count++;
+  for (final data in fonts) {
+    loader.addFont(Future<ByteData>.value(data));
   }
-  if (count == 0) return false;
   await loader.load();
-  return true;
 }
 
 // ============================================================

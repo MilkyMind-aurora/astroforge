@@ -260,7 +260,7 @@ async def test_壳层冒烟_8页换装与抽屉唤起() -> None:
     from tui.plugins.home.page import HomePage
     from tui.service_client import get_client
     from tui.shell.boot import BootScreen
-    from tui.shell.connect import ConnectScreen
+    from tui.shell.connect import ConnectPanel
     from tui.ui.file_browser import FileBrowserScreen
 
     def _page_mounted(app, key: str) -> bool:
@@ -306,11 +306,13 @@ async def test_壳层冒烟_8页换装与抽屉唤起() -> None:
         await pilot.pause()
         assert isinstance(app.screen, LogPanelScreen)
         app.pop_screen()
-        # 其余屏级 CSS 全量编译（同类 $scrim 问题在此一并拦截）
-        app.push_screen(ConnectScreen())
+        # 连接态壳内嵌（L14）：content 区换装 ConnectPanel → 探活复原回当前页
+        await app.show_connect_panel()
         await pilot.pause()
-        assert isinstance(app.screen, ConnectScreen)
-        app.pop_screen()
+        assert app.query(ConnectPanel)                     # 面板在场（CSS 编译即校验）
+        app.restore_after_connect()
+        await wait_page(app, "settings", timeout_s=10.0)   # 循环末当前页=设置页
+        assert not app.query(ConnectPanel)                 # 复原后面板撤下
         app.push_screen(FileBrowserScreen(get_client()))
         await pilot.pause()
         assert isinstance(app.screen, FileBrowserScreen)

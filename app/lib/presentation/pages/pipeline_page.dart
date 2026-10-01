@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/design/design.dart';
+import '../../core/eta/eta_estimator.dart';
 import '../../data/api_client/dio_client.dart';
 import '../../data/ws_client/ws_client.dart';
 import '../widgets/step_timeline.dart';
@@ -147,6 +148,14 @@ class _PipelinePageState extends ConsumerState<PipelinePage> {
             if (payload['steps'] != null) 'steps': payload['steps'],
           };
         });
+        // #18 极光横幅：流水线完成瞬间广播（uuid 去重在总线内）
+        if (type == 'status' &&
+            (payload['status'] as String?) == 'success') {
+          ref.read(taskCompletionsProvider.notifier).announce(
+                taskUuid: uuid,
+                title: current['title'] as String? ?? '流水线任务',
+              );
+        }
         // status 事件载荷无步骤明细 → 变更后 REST 兜底补拉步骤状态
         if (type == 'status') _refetchRun(uuid);
       });
@@ -285,7 +294,7 @@ class _PipelinePageState extends ConsumerState<PipelinePage> {
                           ),
                         )
                       : Text(AstroIcons.navPipeline,
-                          style: const TextStyle(fontSize: 14)),
+                          style: TextStyle(fontSize: AstroType.body.size)),
                   label: Text(_starting ? '启动中…' : '运行流水线'),
                 ),
                 if (_error != null) ...[
@@ -401,7 +410,7 @@ class _PipelineCard extends StatelessWidget {
                       ? AstroIcons.statusOk
                       : AstroIcons.miscStarMid,
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AstroType.caption.size,
                       color: selected ? palette.auroraText : palette.ink400),
                 ),
                 const SizedBox(width: 6),
@@ -496,7 +505,7 @@ class _StepParamCardState extends State<_StepParamCard> {
                         ? AstroIcons.taskSuccess
                         : AstroIcons.taskPending,
                     style: TextStyle(
-                        fontSize: 12, color: palette.auroraText),
+                        fontSize: AstroType.caption.size, color: palette.auroraText),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -514,7 +523,7 @@ class _StepParamCardState extends State<_StepParamCard> {
                   Text(
                     _open ? AstroIcons.miscCaretDown : AstroIcons.miscCaretRight,
                     style:
-                        TextStyle(fontSize: 11, color: palette.ink400),
+                        TextStyle(fontSize: AstroType.label.size, color: palette.ink400),
                   ),
                 ],
               ),
@@ -590,6 +599,16 @@ class _RunTimelineCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = task['status'] as String? ?? 'pending';
     final uuid = task['task_uuid'] as String? ?? '';
+    // M5 ETA：运行中流水线的剩余时长（progress 速率 + 步骤均耗时折算）
+    final eta = status == 'running'
+        ? estimateTaskEta(
+            progress: (task['progress'] as num?)?.toInt() ?? 0,
+            startedAt: DateTime.tryParse(task['started_at'] as String? ?? ''),
+            now: DateTime.now(),
+            steps: (task['steps'] as List?) ?? const [],
+          )
+        : null;
+    final etaSuffix = shouldShowEta(eta) ? ' · 剩余 ${formatEta(eta!)}' : '';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AstroSpace.card),
@@ -604,12 +623,13 @@ class _RunTimelineCard extends StatelessWidget {
                         fontWeight: AstroType.title.weight,
                         color: palette.ink900)),
                 const SizedBox(width: AstroSpace.gap),
-                Text('$uuid · ${task['progress'] ?? 0}% · $status',
-                    style: TextStyle(
-                        fontFamily: AstroType.monoFamily,
-                        fontSize: AstroType.caption.size,
-                        color: palette.ink400)),
-                const Spacer(),
+                Expanded(
+                  child: Text('$uuid · ${task['progress'] ?? 0}% · $status$etaSuffix',
+                      style: TextStyle(
+                          fontFamily: AstroType.monoFamily,
+                          fontSize: AstroType.caption.size,
+                          color: palette.ink400)),
+                ),
                 Text(
                   'Ctrl+` 看日志',
                   style: TextStyle(

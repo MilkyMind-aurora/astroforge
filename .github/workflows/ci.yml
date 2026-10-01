@@ -22,15 +22,26 @@ jobs:
           python-version: "3.12"
       - name: 安装服务核心依赖
         run: pip install -e "server[dev]"
+      # 根 tests 的依赖面：TUI 单测要 Textual（连带 rich，star_console 富文本态也靠它），
+      # wpd 提取要 cv2/numpy（CI 用 headless 版，无 GUI 依赖）；spider 模块纯标准库。
+      - name: 安装根 tests 依赖
+        run: pip install -e "tui" opencv-python-headless
       - name: Ruff lint
         run: ruff check server scripts
-      - name: 单元测试
+      - name: 服务核心单元测试
         run: pytest server/tests -q
+      - name: 根目录功能测试（模块契约/TUI/star_console/ui_doctor/设计契约等全量）
+        run: pytest tests -q
+      - name: star_console 双态输出快照比对（非 TTY 管道 vs FORCE_COLOR 强制着色）
+        run: pytest tests/test_star_console_dual_state.py -q
       - name: SQL 参数绑定守卫（全仓扫描）
         run: python tests/test_sql_injection_guard.py
       - name: 导出 OpenAPI 契约
         if: matrix.os == 'ubuntu-latest'
         run: python scripts/export_openapi.py --output docs/openapi.json
+      - name: OpenAPI 契约 diff=0 门禁（提交版必须与导出逐字节一致）
+        if: matrix.os == 'ubuntu-latest'
+        run: git diff --exit-code docs/openapi.json
       - name: 上传契约产物
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
@@ -60,13 +71,12 @@ jobs:
           fi
       - name: 设计契约单测（点分键覆盖合并 + 生成物一致性）
         run: python -m pytest tests/test_gen_design.py -q
-      # placeholder（占位页清零）与 bare-color（TUI 裸色）属 MF1「TUI 可看」的清账项，
-      # 壳层 token 化重写后摘除这两个 skip。
-      - name: ui_doctor 聚合验收
-        run: python scripts/ui_doctor.py --skip=placeholder,bare-color
+      # MF1 清账项（placeholder 占位页 / bare-color 裸色）已归零，自此全量门禁，不再 skip。
+      - name: ui_doctor 聚合验收（全量门禁）
+        run: python scripts/ui_doctor.py
 
   flutter:
-    name: Flutter（analyze）
+    name: Flutter（analyze + test）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,3 +89,7 @@ jobs:
       - name: Analyze
         working-directory: app
         run: flutter analyze --no-fatal-infos
+      # 金测的字体面已由 Flutter 组解耦（不依赖 CI 机器字体），跨平台是否真绿由汇合门禁统一证明。
+      - name: Test
+        working-directory: app
+        run: flutter test
