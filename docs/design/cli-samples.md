@@ -166,9 +166,63 @@ ESC[38;5;109m  Sidereal Core v0.1.0 · env_spider · spider_siteESC[0m
 .venv/Scripts/python.exe modules/spider/cli.py --config cfg.json --output res.json | cat
 # 态 2/3（TTY：在 Windows Terminal 里直接运行）
 .venv/Scripts/python.exe modules/spider/cli.py --config cfg.json --output res.json
-# 强制着色/纯文本/昼档（测试与样本捕获用）
-ASTROFORGE_CLI_FORCE_COLOR=1 ASTROFORGE_CLI_THEME=light python -c "import star_console; ..."
+# 强制着色（env 单独设置即可：truecolor ANSI，Windows 管道内也可捕获）
+# （实现：force 态锁 Console(force_terminal, color_system="truecolor", legacy_windows=False)）
+ASTROFORGE_CLI_FORCE_COLOR=1 .venv/Scripts/python.exe modules/spider/cli.py --config cfg.json --output res.json | cat
+# 纯文本/昼档（测试与样本捕获用）
+ASTROFORGE_CLI_THEME=light python -c "import star_console as sc; sc.configure(force_plain=True); ..."
 ```
 
 回归：`tests/test_star_console.py`（契约字节/双态/映射表）与 `tests/test_module_contract.py`
 （5 模块 CLI 子进程非 TTY 端到端 + 裸 print=0 + JSON 三键）。
+
+---
+
+## 各模块 --help 样本（实际捕获，统一 argparse 口径）
+
+五个模块 CLI 入口均为 `--config CONFIG --output OUTPUT` 必填双参 + `-h`；
+以下为 `.venv/Scripts/python.exe modules/<m>/cli.py --help` 实际输出（捕获于 2026-10-02，
+usage 首行以文件名呈现属 argparse 默认行为，安装为包后显示模块入口名）：
+
+```text
+=== spider ===
+usage: cli.py [-h] --config CONFIG --output OUTPUT
+
+AstroForge 采集模块（Scrapling/回退 urllib）
+
+options:
+  -h, --help       show this help message and exit
+  --config CONFIG
+  --output OUTPUT
+
+=== mineru ===
+usage: cli.py [-h] --config CONFIG --output OUTPUT
+
+AstroForge MinerU 解析模块
+
+options:（同上三行）
+
+=== wpd ===
+usage: cli.py [-h] --config CONFIG --output OUTPUT
+
+AstroForge WPD 图表提数模块
+
+options:（同上三行）
+
+=== anydoc ===
+usage: cli.py [-h] --config CONFIG --output OUTPUT
+
+AstroForge anydoc 转换模块
+
+options:（同上三行）
+
+=== md2docx ===
+usage: cli.py [-h] --config CONFIG --output OUTPUT
+
+AstroForge MD 转 DOCX 模块
+
+options:（同上三行）
+```
+
+五段 help 除模块描述行外逐字节同构（统一入口约定的验收样本）；脚本类工具
+（scripts/*.bat|.sh）不走 argparse，其用法以各自文件头注释与 README 为准。

@@ -181,10 +181,13 @@ except ImportError:  # pragma: no cover - 取决于运行环境是否携带 rich
     TaskProgressColumn = TextColumn = Table = Text = None  # type: ignore[assignment]
     _RICH_OK = False
 
+_FORCE_COLOR_ENV = os.environ.get("ASTROFORGE_CLI_FORCE_COLOR") == "1"  # 测试/样本生成用
+
 _STATE: dict[str, object] = {
-    "plain": not (_detect_tty() and _RICH_OK),  # True = 纯文本降级态
+    # 着色判定 = (isatty 或 强制着色) 且 rich 可导入；FORCE_COLOR=1 单独设置即解除降级
+    "plain": not ((_detect_tty() or _FORCE_COLOR_ENV) and _RICH_OK),
     "theme": os.environ.get("ASTROFORGE_CLI_THEME", "dark"),  # deep-space 夜为主战场（§1.1）
-    "force_color": os.environ.get("ASTROFORGE_CLI_FORCE_COLOR") == "1",  # 测试/样本生成用
+    "force_color": _FORCE_COLOR_ENV,
 }
 _IS_TTY = _detect_tty()
 _console: object | None = None      # rich Console 懒建（file=None 动态绑 sys.stdout，便于捕获）
@@ -195,29 +198,47 @@ def configure(force_plain: bool | None = None, theme: str | None = None,
               force_color: bool | None = None) -> None:
     """运行态配置（测试/样本生成用）：可强制纯文本或强制着色，可切 dark/light 档。
 
-    默认（不调用时）：plain = not (isatty and rich 可导入)；theme 取环境变量
-    ASTROFORGE_CLI_THEME（默认 dark）。force_color 仅影响 rich Console 的
-    force_terminal（供非 TTY 环境捕获 ANSI 样本），不改变降级判定本身。
+    默认（不调用时）：着色判定 = (isatty 或 ASTROFORGE_CLI_FORCE_COLOR=1) 且 rich
+    可导入，plain 取其反；theme 取环境变量 ASTROFORGE_CLI_THEME（默认 dark）。
+    force_color 使 rich Console 以 force_terminal 运行（非 TTY 也能产出 ANSI 样本），
+    并同时解除纯文本降级；force_plain 显式给出时以其为准（显式覆盖优先）。
     """
     global _console
-    if force_plain is not None:
-        _STATE["plain"] = force_plain
     if theme is not None:
         if theme not in STAR_TOKENS:
             raise ValueError(f"未知色彩档: {theme}（可选: {', '.join(sorted(STAR_TOKENS))}）")
         _STATE["theme"] = theme
     if force_color is not None:
         _STATE["force_color"] = force_color
+    if force_plain is not None:
+        _STATE["plain"] = force_plain
+    elif force_color is not None:
+        _STATE["plain"] = not ((_detect_tty() or bool(_STATE["force_color"])) and _RICH_OK)
     _console = None  # 下次输出按新配置重建 Console
 
 
 def reset() -> None:
     """恢复默认运行态（测试隔离用）：重新双检测、theme 回环境变量默认。"""
     configure(
-        force_plain=not (_detect_tty() and _RICH_OK),
+        force_plain=not ((_detect_tty() or _FORCE_COLOR_ENV) and _RICH_OK),
         theme=os.environ.get("ASTROFORGE_CLI_THEME", "dark"),
-        force_color=os.environ.get("ASTROFORGE_CLI_FORCE_COLOR") == "1",
+        force_color=_FORCE_COLOR_ENV,
     )
+
+
+def spinner_frames() -> list[str]:
+    """旋转帧族：消费 motion.spinner_frame_ms 节流契约与 icons misc.spinner_f1..f4。
+
+    帧内容取自生成段 STAR_ICONS；调用方（探活/加载处）以 spinner_frame_ms 为周期
+    自管计时推进帧序号——star_console 不自建计时器（终端红线：无连续背景动画）。
+    """
+    return [STAR_ICONS[f"misc.spinner_f{i}"] for i in range(1, 5)]
+
+
+def spinner_tick(index: int) -> str:
+    """按帧序号取当前旋转帧（调用方自管计时；序号按绝对值取模循环）。"""
+    frames = spinner_frames()
+    return frames[abs(index) % len(frames)]
 
 
 def _c(token: str) -> str:
@@ -233,12 +254,19 @@ def _st(token: str, bold: bool = False) -> str:
 
 
 def _ensure_console() -> Console:  # type: ignore[name-defined]
-    """懒建 rich Console（file=None 动态绑定 sys.stdout；highlight 关闭防数字误染）。"""
+    """懒建 rich Console（file=None 动态绑定 sys.stdout；highlight 关闭防数字误染）。
+
+    强制着色态需同时锁 color_system=truecolor：Windows 管道会被 rich 判为
+    legacy console（着色走 Win32 API，管道里本就不出 ANSI 字节），锁死后
+    FORCE_COLOR=1 才能在任意管道产出可捕获的 ANSI 样本（§2.5 复现命令口径）。
+    """
     global _console
     if _console is None:
         _console = Console(
             file=None, highlight=False,
             force_terminal=True if _STATE["force_color"] else None,
+            color_system="truecolor" if _STATE["force_color"] else None,
+            legacy_windows=False if _STATE["force_color"] else None,
         )
     return _console  # type: ignore[return-value]
 
@@ -389,7 +417,7 @@ def _rich_progress(done: int, total: int, label: str) -> None:
         progress_obj = Progress(
             TextColumn(f"{label} "),
             BarColumn(bar_width=PROGRESS_WIDTH, complete_style=_c("aurora"),
-                      finished_style=_c("aurora"), pulse_style=_c("nebula")),
+                      finished_style=_c("aurora"), pulse_style=_c("ink-600")),
             TextColumn("· "), MofNCompleteColumn(), TextColumn("· "), TaskProgressColumn(),
             console=_ensure_console(), transient=True,
             refresh_per_second=max(1, round(1000 / throttle)),
